@@ -1,7 +1,6 @@
 # Data
 pandas>=2.2.0
 numpy>=1.26.4
-wrds>=3.1.6
 
 # Optimization
 scipy>=1.11.4

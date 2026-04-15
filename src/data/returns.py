@@ -7,7 +7,7 @@ Excess return = MthRet - rf (monthly decimal)
 
 This is the final processed data file used by all models:
 - GA optimization
-- MVO benchmarks  
+- MVO benchmarks
 - 1/N benchmark
 - Evaluation metrics
 """
@@ -41,37 +41,24 @@ def load_rf(path: str = "data/processed/risk_free_rate.parquet") -> pd.DataFrame
     return df
 
 
-def align_dates(crsp_date: pd.Timestamp,
-                rf_date:   pd.Timestamp) -> bool:
-    """
-    CRSP dates are end-of-month (e.g. 2005-01-31).
-    FRED dates are start-of-month (e.g. 2005-01-01).
-    Both refer to the same calendar month — match on year + month.
-    """
-    return (crsp_date.year  == rf_date.year and
-            crsp_date.month == rf_date.month)
-
-
 def compute_excess_returns(universe:  pd.DataFrame,
                            crsp:      pd.DataFrame,
                            rf:        pd.DataFrame) -> pd.DataFrame:
     """
     Compute monthly excess returns for all stocks in the eligible universe.
 
-    Steps:
-    1. For each rebalancing date t, identify the eligible stocks
-    2. Get their returns for the 60-month estimation window [t-60, t-1]
-    3. Subtract the monthly risk-free rate to get excess returns
-    4. Store as a wide matrix: rows = months, columns = PERMNOs
+    CRSP dates are end-of-month (e.g. 2005-01-31).
+    FRED dates are start-of-month (e.g. 2005-01-01).
+    Both refer to the same calendar month — matched on year-month period.
 
-    Returns DataFrame with columns:
-    - date: rebalancing date t
-    - permno: stock identifier
-    - ret: raw monthly return
-    - rf: monthly risk-free rate
-    - excess_ret: ret - rf
+    Returns long-format DataFrame with columns:
+    - date       : end-of-month date (CRSP convention)
+    - permno     : stock identifier
+    - ret        : raw monthly total return (MthRet, includes delisting)
+    - rf         : monthly risk-free rate (decimal)
+    - excess_ret : ret - rf
     """
-    # Merge rf onto crsp by year-month
+    # Merge rf onto crsp by year-month period
     crsp = crsp.copy()
     crsp["year_month"] = crsp["date"].dt.to_period("M")
     rf = rf.copy()
@@ -86,9 +73,7 @@ def compute_excess_returns(universe:  pd.DataFrame,
     # Compute excess return
     crsp["excess_ret"] = crsp["ret"] - crsp["rf"]
 
-    # Keep only stocks in the eligible universe
-    # Universe has one row per (rebalancing_date, permno)
-    # We need the full return history for each eligible stock
+    # Keep only stocks that appear in the eligible universe
     eligible_permnos = universe["permno"].unique()
     crsp_eligible = crsp[crsp["permno"].isin(eligible_permnos)].copy()
 
@@ -118,28 +103,24 @@ def validate_excess_returns(df: pd.DataFrame) -> None:
     print(f"✓ Date range: {df['date'].min().date()} "
           f"to {df['date'].max().date()}")
 
-    # Check no future rf (rf should always be available at t)
+    # Check rf range
     print(f"✓ rf range: {df['rf'].min():.6f} to {df['rf'].max():.6f}")
 
     print("--- Validation passed ---\n")
 
 
 if __name__ == "__main__":
-    # Load all three inputs
     universe = load_universe()
     crsp     = load_crsp()
     rf       = load_rf()
 
-    # Compute excess returns
     print("\nComputing excess returns...")
     df = compute_excess_returns(universe, crsp, rf)
     validate_excess_returns(df)
 
-    # Save
     os.makedirs("data/processed", exist_ok=True)
     cols = ["date", "permno", "ticker", "ret", "rf", "excess_ret",
             "prc", "shrout", "exchcd"]
-    # Keep only columns that exist
     cols = [c for c in cols if c in df.columns]
     df[cols].to_parquet("data/processed/returns.parquet", index=False)
     print(f"Saved {len(df):,} rows to data/processed/returns.parquet")

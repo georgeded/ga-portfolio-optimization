@@ -128,7 +128,7 @@ def build_monthly_universe(df: pd.DataFrame,
 
 def build_full_universe(df: pd.DataFrame,
                         start_date: str = "2005-01-01",
-                        end_date:   str = "2025-01-01") -> dict:
+                        end_date:   str = "2025-12-01") -> dict:
     """
     Build the eligible universe at every monthly rebalancing date.
 
@@ -189,13 +189,13 @@ def validate_universe(universe: dict) -> None:
         print("✓ Universe size stable over time")
 
     # Descriptive summary for thesis reporting
-    print(f"\nUniverse size summary (descriptive):")
+    print("\nUniverse size summary (descriptive):")
     print(f"  Mean   : {sizes.mean():.0f} stocks")
     print(f"  Median : {sizes.median():.0f} stocks")
     print(f"  Min    : {sizes.min()} stocks")
     print(f"  Max    : {sizes.max()} stocks")
-    print(f"  Note   : Step 5 estimate was 100-300 based on literature.")
-    print(f"           Actual size reflects full $2B filter on real data.")
+    print("  Note   : Step 5 estimate was 100-300 based on literature.")
+    print("           Actual size reflects full $2B filter on real data.")
 
 
 if __name__ == "__main__":

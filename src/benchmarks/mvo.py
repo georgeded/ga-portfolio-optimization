@@ -1,5 +1,4 @@
 """
-src/benchmarks/mvo.py
 Benchmark 1: Mean-Variance Optimization (Markowitz)
 
 Two versions as per Step 12 methodology:
@@ -44,6 +43,15 @@ from src.evaluation.metrics import (
     TRANSACTION_COST
 )
 
+from src.utils.portfolio import (
+    get_monthly_returns,
+    get_rf_for_month,
+    compute_drift_weights,
+    cap_universe,
+    align_drifted_weights,
+    load_data
+)
+
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 ESTIMATION_WINDOW   = 60
@@ -51,24 +59,6 @@ W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
 W_MIN_CONSTRAINED   = 0.02
 W_MAX_CONSTRAINED   = 0.15
-
-
-# ── Data Loading ──────────────────────────────────────────────────────────────
-
-def load_data(
-    universe_path: str = "data/processed/universe.parquet",
-    returns_path:  str = "data/processed/returns.parquet",
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Load universe and returns data."""
-    universe = pd.read_parquet(universe_path)
-    universe["date"] = pd.to_datetime(universe["date"])
-
-    returns = pd.read_parquet(returns_path)
-    returns["date"] = pd.to_datetime(returns["date"])
-
-    print(f"Universe loaded: {universe['date'].nunique()} rebalancing dates")
-    print(f"Returns loaded:  {len(returns):,} rows")
-    return universe, returns
 
 
 # ── Estimation ────────────────────────────────────────────────────────────────
@@ -197,41 +187,6 @@ def optimize_mvo(mu:         np.ndarray,
     best_weights = best_weights / best_weights.sum()
     return best_weights
 
-
-# ── Portfolio Helpers ─────────────────────────────────────────────────────────
-
-def get_monthly_returns(returns: pd.DataFrame,
-                        permnos: list,
-                        month:   pd.Timestamp) -> pd.Series:
-    """Get realized returns for a set of stocks in a given month."""
-    mask = (
-        (returns["date"] == month) &
-        (returns["permno"].isin(permnos))
-    )
-    return (returns.loc[mask]
-            .set_index("permno")["ret"]
-            .reindex(permnos, fill_value=0.0)
-            .fillna(0.0))
-
-
-def get_rf_for_month(returns: pd.DataFrame,
-                     month:   pd.Timestamp) -> float:
-    """Get the risk-free rate for a given month."""
-    rf_vals = returns.loc[returns["date"] == month, "rf"].dropna()
-    return float(rf_vals.iloc[0]) if len(rf_vals) > 0 else 0.0
-
-
-def compute_drift_weights(weights:       np.ndarray,
-                          stock_returns: np.ndarray) -> np.ndarray:
-    """Compute drifted weights after one month of returns."""
-    stock_returns = np.nan_to_num(stock_returns, nan=0.0)
-    drifted       = weights * (1 + stock_returns)
-    total         = drifted.sum()
-    if total <= 0:
-        return np.ones(len(weights)) / len(weights)
-    return drifted / total
-
-
 # ── Single Period Processing ──────────────────────────────────────────────────
 
 def _process_single_period(t:            pd.Timestamp,
@@ -274,12 +229,8 @@ def _process_single_period(t:            pd.Timestamp,
     if prev_weights is not None and prev_permnos is not None:
         prev_ret      = get_monthly_returns(returns, prev_permnos, apply_date)
         drifted       = compute_drift_weights(prev_weights, prev_ret.values)
-        drifted_series = (pd.Series(drifted, index=prev_permnos)
-                          .reindex(valid_permnos, fill_value=0.0))
-        drifted_array  = drifted_series.values
-        if drifted_array.sum() > 0:
-            drifted_array = drifted_array / drifted_array.sum()
-        to = portfolio_turnover(weights, drifted_array)
+        drifted_array = align_drifted_weights(drifted, prev_permnos, valid_permnos)
+        to            = portfolio_turnover(weights, drifted_array)
     else:
         to = 1.0
 
@@ -384,38 +335,6 @@ def print_results(results: pd.DataFrame,
     print(f"Avg Transaction Cost   : {metrics['avg_transaction_cost']*100:.4f}%")
     print(f"Avg HHI                : {results['hhi'].mean():.6f}")
     print("="*50)
-
-def cap_universe(universe:  pd.DataFrame,
-                 returns:   pd.DataFrame,
-                 top_n:     int = 200) -> pd.DataFrame:
-    """
-    At each rebalancing date, keep only the top N stocks by market cap.
-    Market cap = |prc| × shrout × 1000 (in millions).
-    This reduces the optimisation problem from ~860 to top_n stocks,
-    making MVO and GA computationally tractable.
-    Standard practice in empirical portfolio optimisation literature.
-    """
-    returns = returns.copy()
-    returns["mktcap"] = returns["prc"].abs() * returns["shrout"] * 1000
-
-    result_rows = []
-    for date, group in universe.groupby("date"):
-        permnos = group["permno"].tolist()
-
-        # Get market cap for these stocks at this date
-        date_ret = returns[
-            (returns["date"].dt.year  == date.year) &
-            (returns["date"].dt.month == date.month) &
-            (returns["permno"].isin(permnos))
-        ][["permno", "mktcap"]].drop_duplicates("permno")
-
-        # Take top N by market cap
-        top = date_ret.nlargest(top_n, "mktcap")["permno"].tolist()
-
-        for p in top:
-            result_rows.append({"date": date, "permno": p})
-
-    return pd.DataFrame(result_rows)
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 

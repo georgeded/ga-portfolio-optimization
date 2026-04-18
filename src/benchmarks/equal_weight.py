@@ -25,21 +25,23 @@ Reference: DeMiguel et al. (2009) "Optimal Versus Naive Diversification"
 import numpy as np
 import pandas as pd
 import os
+
 from src.evaluation.metrics import (
-    compute_all_metrics,
     portfolio_turnover,
     herfindahl_index,
     TRANSACTION_COST
 )
-
+from src.utils.data import load_data
 from src.utils.portfolio import (
     get_monthly_returns,
     get_rf_for_month,
     compute_drift_weights,
     cap_universe,
     align_drifted_weights,
-    load_data
+    print_results,
 )
+
+
 # ── Main Runner ───────────────────────────────────────────────────────────────
 
 def run_equal_weight(universe: pd.DataFrame,
@@ -127,39 +129,6 @@ def run_equal_weight(universe: pd.DataFrame,
         prev_permnos = eligible
 
     return pd.DataFrame(results)
-
-
-# ── Results Printing ──────────────────────────────────────────────────────────
-
-def print_results(results: pd.DataFrame,
-                  label:   str,
-                  gamma:   float = TRANSACTION_COST) -> None:
-    """Print performance summary."""
-    clean     = results.dropna(subset=["excess_ret", "rf", "turnover"])
-    excess    = clean["excess_ret"].values
-    rf        = clean["rf"].values
-    turnovers = clean["turnover"].values
-
-    metrics = compute_all_metrics(excess, rf, turnovers, gamma)
-
-    print("\n" + "="*50)
-    print(f"{label} RESULTS")
-    print("="*50)
-    print(f"Period : {results['date'].min().date()} "
-          f"to {results['date'].max().date()}")
-    print(f"Months : {len(results)}")
-    print(f"Avg N  : {results['n_stocks'].mean():.0f} stocks")
-    print()
-    print(f"Sharpe Ratio (net)     : {metrics['sharpe_net']:.4f}")
-    print(f"Sharpe Ratio (gross)   : {metrics['sharpe_gross']:.4f}")
-    print(f"Annualized Return (net): {metrics['ann_return_net']*100:.2f}%")
-    print(f"Annualized Volatility  : {metrics['ann_vol']*100:.2f}%")
-    print(f"Max Drawdown (net)     : {metrics['max_drawdown_net']*100:.2f}%")
-    print(f"Avg Monthly Turnover   : {metrics['avg_turnover']*100:.2f}%")
-    print(f"Avg Transaction Cost   : {metrics['avg_transaction_cost']*100:.4f}%")
-    print(f"Avg HHI                : {results['hhi'].mean():.6f}")
-    print(f"Theoretical min HHI    : {(1/results['n_stocks'].mean()):.6f}")
-    print("="*50)
 
 
 # ── Entry Point ───────────────────────────────────────────────────────────────

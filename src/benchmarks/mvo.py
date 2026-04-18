@@ -42,14 +42,14 @@ from src.evaluation.metrics import (
     herfindahl_index,
     TRANSACTION_COST
 )
-
+from src.utils.data import load_data
 from src.utils.portfolio import (
     get_monthly_returns,
     get_rf_for_month,
     compute_drift_weights,
     cap_universe,
     align_drifted_weights,
-    load_data
+    print_results,
 )
 
 
@@ -114,12 +114,7 @@ def get_estimation_window(returns:        pd.DataFrame,
 def negative_sharpe(weights: np.ndarray,
                     mu:      np.ndarray,
                     sigma:   np.ndarray) -> float:
-    """
-    Objective function: negative Sharpe ratio (minimized by scipy).
-
-    Sharpe = (w' μ) / sqrt(w' Σ w)
-    μ is already excess returns — no rf subtraction needed.
-    """
+    """Objective function: negative Sharpe ratio (minimized by scipy)."""
     port_return = float(weights @ mu)
     port_var    = float(weights @ sigma @ weights)
     if port_var <= 0:
@@ -187,6 +182,7 @@ def optimize_mvo(mu:         np.ndarray,
     best_weights = best_weights / best_weights.sum()
     return best_weights
 
+
 # ── Single Period Processing ──────────────────────────────────────────────────
 
 def _process_single_period(t:            pd.Timestamp,
@@ -200,12 +196,7 @@ def _process_single_period(t:            pd.Timestamp,
                             prev_permnos: list,
                             rng:          np.random.Generator
                             ) -> tuple:
-    """
-    Process one rebalancing period.
-
-    Returns:
-        (result_dict or None, new_prev_weights, new_prev_permnos)
-    """
+    """Process one rebalancing period."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
@@ -304,37 +295,6 @@ def run_mvo(universe:    pd.DataFrame,
 
     return pd.DataFrame(results)
 
-
-# ── Results Printing ──────────────────────────────────────────────────────────
-
-def print_results(results: pd.DataFrame,
-                  label:   str,
-                  gamma:   float = TRANSACTION_COST) -> None:
-    """Print performance summary."""
-    clean     = results.dropna(subset=["excess_ret", "rf", "turnover"])
-    excess    = clean["excess_ret"].values
-    rf        = clean["rf"].values
-    turnovers = clean["turnover"].values
-
-    metrics = compute_all_metrics(excess, rf, turnovers, gamma)
-
-    print("\n" + "="*50)
-    print(f"{label} RESULTS")
-    print("="*50)
-    print(f"Period : {results['date'].min().date()} "
-          f"to {results['date'].max().date()}")
-    print(f"Months : {len(results)}")
-    print(f"Avg N  : {results['n_stocks'].mean():.0f} stocks")
-    print()
-    print(f"Sharpe Ratio (net)     : {metrics['sharpe_net']:.4f}")
-    print(f"Sharpe Ratio (gross)   : {metrics['sharpe_gross']:.4f}")
-    print(f"Annualized Return (net): {metrics['ann_return_net']*100:.2f}%")
-    print(f"Annualized Volatility  : {metrics['ann_vol']*100:.2f}%")
-    print(f"Max Drawdown (net)     : {metrics['max_drawdown_net']*100:.2f}%")
-    print(f"Avg Monthly Turnover   : {metrics['avg_turnover']*100:.2f}%")
-    print(f"Avg Transaction Cost   : {metrics['avg_transaction_cost']*100:.4f}%")
-    print(f"Avg HHI                : {results['hhi'].mean():.6f}")
-    print("="*50)
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 

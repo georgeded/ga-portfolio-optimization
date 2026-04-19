@@ -11,7 +11,8 @@ Two versions as per Step 12 methodology:
 
 (b) Constrained MVO (QP):
     - Maximize Sharpe ratio
-    - Weight bounds: [0.02, 0.15] per stock
+    - Weight bounds: [0.0, 0.15] per stock (long-only, max concentration limit)
+    - Cite: Jagannathan & Ma (2003)
     - Budget constraint: weights sum to 1
     - No cardinality constraint (QP cannot handle it)
     - Evaluated at K=20 (midpoint), K=10, K=30 for robustness
@@ -57,7 +58,7 @@ from src.utils.portfolio import (
 ESTIMATION_WINDOW   = 60
 W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
-W_MIN_CONSTRAINED   = 0.02
+W_MIN_CONSTRAINED   = 0.0
 W_MAX_CONSTRAINED   = 0.15
 
 
@@ -257,7 +258,7 @@ def run_mvo(universe:    pd.DataFrame,
     Args:
         universe:    DataFrame with columns [date, permno]
         returns:     DataFrame with columns [date, permno, ret, rf, excess_ret]
-        constrained: if True use weight bounds [0.02, 0.15],
+        #        constrained: if True use weight bounds [0.0, 0.15] (long-only, max 15%),
                      if False use [0, 1] (unconstrained)
         gamma:       proportional transaction cost rate
         seed:        random seed for reproducibility

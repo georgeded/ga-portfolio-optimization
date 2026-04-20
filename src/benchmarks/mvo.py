@@ -127,7 +127,7 @@ def optimize_mvo(mu:         np.ndarray,
                  sigma:      np.ndarray,
                  w_min:      float,
                  w_max:      float,
-                 n_restarts: int = 3,
+                 n_restarts: int = 1,
                  rng:        np.random.Generator = None) -> np.ndarray:
     """
     Maximize Sharpe ratio subject to weight bounds and budget constraint.

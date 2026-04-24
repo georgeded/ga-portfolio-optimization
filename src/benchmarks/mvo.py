@@ -1,25 +1,25 @@
 """
-Benchmark 1: Mean-Variance Optimization (Markowitz)
+Benchmark: Mean-Variance Optimization (Markowitz)
 
 Two versions as per Step 12 methodology:
 
 (a) Unconstrained MVO:
     - Maximize Sharpe ratio
-    - Long-only (weights >= 0)
+    - Long-only: weight bounds [0.0, 1.0]
     - No cardinality constraint
     - No turnover penalty
+    - Cite: DeMiguel et al. (2009)
 
 (b) Constrained MVO (QP):
     - Maximize Sharpe ratio
-    - Weight bounds: [0.0, 0.15] per stock (long-only, max concentration limit)
-    - Cite: Jagannathan & Ma (2003)
+    - Long-only, max concentration: weight bounds [0.0, 0.15]
     - Budget constraint: weights sum to 1
     - No cardinality constraint (QP cannot handle it)
-    - Evaluated at K=20 (midpoint), K=10, K=30 for robustness
+    - Cite: Jagannathan & Ma (2003)
 
 Both use:
 - Same 60-month rolling estimation window as GA
-- Same eligible universe at each rebalancing date
+- Same full eligible universe at each rebalancing date (~867 stocks)
 - Same transaction cost model (γ = 0.3%)
 - Sample mean for expected returns
 - Sample covariance matrix for risk
@@ -39,7 +39,6 @@ from tqdm import tqdm
 from src.evaluation.metrics import (
     portfolio_turnover,
     transaction_cost,
-    compute_all_metrics,
     herfindahl_index,
     TRANSACTION_COST
 )
@@ -48,7 +47,6 @@ from src.utils.portfolio import (
     get_monthly_returns,
     get_rf_for_month,
     compute_drift_weights,
-    cap_universe,
     align_drifted_weights,
     print_results,
 )
@@ -66,18 +64,12 @@ W_MAX_CONSTRAINED   = 0.15
 
 def get_estimation_window(returns:        pd.DataFrame,
                           permnos:        list,
-                          rebalance_date: pd.Timestamp
-                          ) -> tuple:
+                          rebalance_date: pd.Timestamp) -> tuple:
     """
     Get expected returns and covariance matrix for the estimation window.
 
-    Uses data from [t-60, t-1] months (60-month rolling window).
-    Returns and covariance are computed on excess returns.
-
-    Args:
-        returns:        full returns DataFrame
-        permnos:        eligible stocks at rebalancing date t
-        rebalance_date: the rebalancing date t (month-start)
+    Uses excess returns from [t-60, t-1] months (60-month rolling window).
+    Drops stocks with any missing return in the window.
 
     Returns:
         mu:            expected excess returns vector (N,)
@@ -94,10 +86,9 @@ def get_estimation_window(returns:        pd.DataFrame,
     )
     window_data = returns[mask][["date", "permno", "excess_ret"]]
 
-    ret_matrix = window_data.pivot(
+    ret_matrix    = window_data.pivot(
         index="date", columns="permno", values="excess_ret"
-    )
-    ret_matrix    = ret_matrix.dropna(axis=1)
+    ).dropna(axis=1)
     valid_permnos = ret_matrix.columns.tolist()
 
     if len(valid_permnos) < 2:
@@ -115,7 +106,7 @@ def get_estimation_window(returns:        pd.DataFrame,
 def negative_sharpe(weights: np.ndarray,
                     mu:      np.ndarray,
                     sigma:   np.ndarray) -> float:
-    """Objective function: negative Sharpe ratio (minimized by scipy)."""
+    """Objective: negative Sharpe ratio (minimized by scipy SLSQP)."""
     port_return = float(weights @ mu)
     port_var    = float(weights @ sigma @ weights)
     if port_var <= 0:
@@ -132,7 +123,7 @@ def optimize_mvo(mu:         np.ndarray,
     """
     Maximize Sharpe ratio subject to weight bounds and budget constraint.
 
-    Uses scipy SLSQP with multiple random restarts to avoid local optima.
+    Uses scipy SLSQP. Falls back to equal weights on solver failure.
 
     Args:
         mu:         expected returns vector (N,)
@@ -143,7 +134,7 @@ def optimize_mvo(mu:         np.ndarray,
         rng:        numpy Generator for reproducibility
 
     Returns:
-        Optimal weight vector (N,). Falls back to equal weights on failure.
+        Optimal weight vector (N,).
     """
     if rng is None:
         rng = np.random.default_rng(seed=42)
@@ -195,9 +186,8 @@ def _process_single_period(t:            pd.Timestamp,
                             gamma:        float,
                             prev_weights: np.ndarray,
                             prev_permnos: list,
-                            rng:          np.random.Generator
-                            ) -> tuple:
-    """Process one rebalancing period."""
+                            rng:          np.random.Generator) -> tuple:
+    """Process one rebalancing period. Returns (result_dict, new_weights, new_permnos)."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
@@ -206,10 +196,8 @@ def _process_single_period(t:            pd.Timestamp,
     if mu is None or len(valid_permnos) < 2:
         return None, prev_weights, prev_permnos
 
-    # Optimize weights
     weights = optimize_mvo(mu, sigma, w_min, w_max, rng=rng)
 
-    # Get realized returns and rf
     month_ret     = get_monthly_returns(returns, valid_permnos, apply_date)
     stock_returns = month_ret.values
     rf            = get_rf_for_month(returns, apply_date)
@@ -217,7 +205,6 @@ def _process_single_period(t:            pd.Timestamp,
     portfolio_gross  = float(np.dot(weights, stock_returns))
     portfolio_excess = portfolio_gross - rf
 
-    # Compute turnover
     if prev_weights is not None and prev_permnos is not None:
         prev_ret      = get_monthly_returns(returns, prev_permnos, apply_date)
         drifted       = compute_drift_weights(prev_weights, prev_ret.values)
@@ -241,8 +228,7 @@ def _process_single_period(t:            pd.Timestamp,
         "hhi"           : herfindahl_index(weights),
     }
 
-    new_prev_weights = compute_drift_weights(weights, stock_returns)
-    return result, new_prev_weights, valid_permnos
+    return result, compute_drift_weights(weights, stock_returns), valid_permnos
 
 
 # ── Main Runner ───────────────────────────────────────────────────────────────
@@ -258,8 +244,8 @@ def run_mvo(universe:    pd.DataFrame,
     Args:
         universe:    DataFrame with columns [date, permno]
         returns:     DataFrame with columns [date, permno, ret, rf, excess_ret]
-        #        constrained: if True use weight bounds [0.0, 0.15] (long-only, max 15%),
-                     if False use [0, 1] (unconstrained)
+        constrained: if True use weight bounds [0.0, 0.15] (Jagannathan & Ma 2003),
+                     if False use [0.0, 1.0] (long-only, unconstrained)
         gamma:       proportional transaction cost rate
         seed:        random seed for reproducibility
 
@@ -302,11 +288,8 @@ def run_mvo(universe:    pd.DataFrame,
 if __name__ == "__main__":
     universe, returns = load_data()
 
-    # Cap universe to top 200 stocks by market cap
-    print("Capping universe to top 200 stocks by market cap...")
-    universe = cap_universe(universe, returns, top_n=200)
-    print(f"Capped universe: {universe.groupby('date').size().mean():.0f} "
-          f"stocks/month on average")
+    print(f"Universe: {universe['date'].nunique()} rebalancing dates, "
+          f"avg {universe.groupby('date').size().mean():.0f} stocks/month")
 
     print("\nRunning Unconstrained MVO...")
     results_unconstrained = run_mvo(universe, returns, constrained=False)

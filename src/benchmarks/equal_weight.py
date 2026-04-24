@@ -1,23 +1,15 @@
 """
 Benchmark: Equal-Weight Portfolio (1/N)
 
-Two versions as per updated Step 12 methodology:
+Constructs a naive equal-weight portfolio that assigns weight 1/N
+to every stock in the eligible universe at each rebalancing date t.
 
-(a) 1/N Full Universe:
-    - Equal weight across all eligible stocks (~867/month)
-    - Primary naive benchmark, consistent with DeMiguel et al. (2009)
-    - Hardest comparator — maximum diversification
-
-(b) 1/N Top-200:
-    - Equal weight across top 200 stocks by market cap
-    - Same universe as GA and MVO
-    - Secondary benchmark for direct comparison
-    - Isolates effect of weight optimization vs naive allocation
-
-Performance decomposition enabled by running both:
-    1/N Full → 1/N Top-200:   effect of universe restriction
-    1/N Top-200 → GA:         effect of weight optimization
-    GA → Constrained MVO:     effect of cardinality constraint
+Key properties:
+- No estimation required
+- Rebalanced monthly back to equal weights
+- Full eligible universe (~867 stocks) — consistent with DeMiguel et al. (2009)
+- Transaction costs applied via turnover calculation
+- Weights drift between rebalancing dates
 
 Reference: DeMiguel et al. (2009) "Optimal Versus Naive Diversification"
 """
@@ -36,13 +28,10 @@ from src.utils.portfolio import (
     get_monthly_returns,
     get_rf_for_month,
     compute_drift_weights,
-    cap_universe,
     align_drifted_weights,
     print_results,
 )
 
-
-# ── Main Runner ───────────────────────────────────────────────────────────────
 
 def run_equal_weight(universe: pd.DataFrame,
                      returns:  pd.DataFrame,
@@ -108,6 +97,7 @@ def run_equal_weight(universe: pd.DataFrame,
             turnover      = portfolio_turnover(weights, drifted_array)
         else:
             turnover = 1.0
+
         # Step 5: Transaction cost and net return
         cost       = gamma * turnover
         net_excess = portfolio_excess - cost
@@ -131,35 +121,15 @@ def run_equal_weight(universe: pd.DataFrame,
     return pd.DataFrame(results)
 
 
-# ── Entry Point ───────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
-    universe_full, returns = load_data()
+    universe, returns = load_data()
 
-    # ── Run 1: Full universe (~867 stocks) ────────────────────────────────────
     print("\nRunning 1/N — Full Universe...")
-    results_full = run_equal_weight(universe_full, returns)
-    print_results(results_full, "1/N FULL UNIVERSE (~867 stocks)")
+    results = run_equal_weight(universe, returns)
+    print_results(results, "1/N FULL UNIVERSE", show_theoretical_hhi=True)
 
-    # ── Run 2: Top-200 universe ───────────────────────────────────────────────
-    print("\nCapping universe to top 200 stocks by market cap...")
-    universe_200 = cap_universe(universe_full, returns, top_n=200)
-    print(f"Capped: {universe_200.groupby('date').size().mean():.0f} "
-          f"stocks/month on average")
-
-    print("\nRunning 1/N — Top-200 Universe...")
-    results_200 = run_equal_weight(universe_200, returns)
-    print_results(results_200, "1/N TOP-200 UNIVERSE")
-
-    # ── Save both ─────────────────────────────────────────────────────────────
     os.makedirs("results/benchmarks", exist_ok=True)
-
-    results_full.to_parquet(
+    results.to_parquet(
         "results/benchmarks/equal_weight_full.parquet", index=False
     )
-    results_200.to_parquet(
-        "results/benchmarks/equal_weight_top200.parquet", index=False
-    )
-    print("\nSaved:")
-    print("  results/benchmarks/equal_weight_full.parquet")
-    print("  results/benchmarks/equal_weight_top200.parquet")
+    print("\nSaved: results/benchmarks/equal_weight_full.parquet")

@@ -1,5 +1,4 @@
 """
-tests/test_metrics.py
 Unit tests for src/evaluation/metrics.py
 
 Each test verifies one function using a known input where the

@@ -575,9 +575,9 @@ def run_ga(n_assets:     int,
         while i < POP_SIZE:
             p1     = tournament_select(population, fitnesses, rng)
             p2     = tournament_select(population, fitnesses, rng)
-            c1, c2 = crossover(p1, p2, rng)
-            c1     = mutate(c1, rng)
-            c2     = mutate(c2, rng)
+            c1, c2 = crossover(p1, p2, rng, pc=PC)
+            c1     = mutate(c1, rng, pm=PM)
+            c2     = mutate(c2, rng, pm=PM)
             new_pop[i] = c1
             i += 1
             if i < POP_SIZE:

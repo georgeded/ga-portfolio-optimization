@@ -49,56 +49,14 @@ from src.utils.portfolio import (
     compute_drift_weights,
     align_drifted_weights,
     print_results,
+    get_estimation_window
 )
 
-
 # ── Constants ─────────────────────────────────────────────────────────────────
-ESTIMATION_WINDOW   = 60
 W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
 W_MIN_CONSTRAINED   = 0.0
 W_MAX_CONSTRAINED   = 0.15
-
-
-# ── Estimation ────────────────────────────────────────────────────────────────
-
-def get_estimation_window(returns:        pd.DataFrame,
-                          permnos:        list,
-                          rebalance_date: pd.Timestamp) -> tuple:
-    """
-    Get expected returns and covariance matrix for the estimation window.
-
-    Uses excess returns from [t-60, t-1] months (60-month rolling window).
-    Drops stocks with any missing return in the window.
-
-    Returns:
-        mu:            expected excess returns vector (N,)
-        sigma:         covariance matrix (N, N)
-        valid_permnos: stocks with complete 60-month history
-    """
-    window_end   = rebalance_date - pd.DateOffset(days=1)
-    window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
-
-    mask = (
-        (returns["date"] >= window_start) &
-        (returns["date"] <= window_end) &
-        (returns["permno"].isin(permnos))
-    )
-    window_data = returns[mask][["date", "permno", "excess_ret"]]
-
-    ret_matrix    = window_data.pivot(
-        index="date", columns="permno", values="excess_ret"
-    ).dropna(axis=1)
-    valid_permnos = ret_matrix.columns.tolist()
-
-    if len(valid_permnos) < 2:
-        return None, None, []
-
-    ret_array = ret_matrix.values
-    mu        = ret_array.mean(axis=0)
-    sigma     = np.cov(ret_array, rowvar=False)
-
-    return mu, sigma, valid_permnos
 
 
 # ── Optimization ──────────────────────────────────────────────────────────────

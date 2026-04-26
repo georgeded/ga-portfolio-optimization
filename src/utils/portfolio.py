@@ -120,6 +120,7 @@ def get_estimation_window(returns:        pd.DataFrame,
     ret_array = ret_matrix.values
     mu        = ret_array.mean(axis=0)
     sigma     = np.cov(ret_array, rowvar=False)
+    sigma = sigma + 1e-4 * np.eye(len(valid_permnos))
 
     return mu, sigma, valid_permnos
 

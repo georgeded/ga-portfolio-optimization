@@ -117,7 +117,7 @@ def optimize_mvo(mu:         np.ndarray,
                 method="SLSQP",
                 bounds=bounds,
                 constraints=constraints,
-                options={"maxiter": 1000, "ftol": 1e-9}
+                options={"maxiter": 200, "ftol": 1e-6}
             )
             if result.success and (-result.fun) > best_sharpe:
                 best_sharpe  = -result.fun

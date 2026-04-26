@@ -249,19 +249,20 @@ if __name__ == "__main__":
     print(f"Universe: {universe['date'].nunique()} rebalancing dates, "
           f"avg {universe.groupby('date').size().mean():.0f} stocks/month")
 
+    os.makedirs("results/benchmarks", exist_ok=True)
+
     print("\nRunning Unconstrained MVO...")
     results_unconstrained = run_mvo(universe, returns, constrained=False)
     print_results(results_unconstrained, "UNCONSTRAINED MVO")
+    results_unconstrained.to_parquet(
+        "results/benchmarks/mvo_unconstrained.parquet", index=False
+    )
+    print("Saved: results/benchmarks/mvo_unconstrained.parquet")
 
     print("\nRunning Constrained MVO...")
     results_constrained = run_mvo(universe, returns, constrained=True)
     print_results(results_constrained, "CONSTRAINED MVO (QP)")
-
-    os.makedirs("results/benchmarks", exist_ok=True)
-    results_unconstrained.to_parquet(
-        "results/benchmarks/mvo_unconstrained.parquet", index=False
-    )
     results_constrained.to_parquet(
         "results/benchmarks/mvo_constrained.parquet", index=False
     )
-    print("\nSaved to results/benchmarks/")
+    print("Saved: results/benchmarks/mvo_constrained.parquet")

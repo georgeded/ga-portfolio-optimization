@@ -23,11 +23,10 @@ LOCAL_STEP = 0.01    # local refinement step size δ
 EARLY_STOP = 20      # stagnation patience in generations
 TOURNAMENT = 3       # tournament selection size k (Eiben & Smith 2015)
 
-# ── Hyperparameters (tuned by Optuna, defaults from literature) ───────────────
-PC         = 0.8     # crossover probability — Optuna searches [0.6, 0.95]
-PM         = 0.1     # mutation probability  — Optuna searches [0.01, 0.3]
-SIGMA_M    = 0.02    # Gaussian mutation std — Optuna searches [0.01, 0.15]
-LAMBDA     = 0.0     # turnover penalty λ    — Optuna searches [0.0, 2.0]
+PC      = 0.6054
+PM      = 0.1370
+SIGMA_M = 0.1469
+LAMBDA  = 1.8437
 
 DEBUG = False
 

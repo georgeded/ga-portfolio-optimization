@@ -3,19 +3,20 @@ Statistical Significance Testing
 Compares GA performance against MVO and 1/N benchmarks using:
 
 1. Paired t-test on monthly net excess returns
-   - Tests whether mean return difference is statistically significant
    - H0: mean(GA returns) - mean(benchmark returns) = 0
 
 2. Jobson-Korkie test with Memmel (2003) correction
-   - Tests whether Sharpe ratio difference is statistically significant
    - H0: Sharpe(GA) - Sharpe(benchmark) = 0
    - Status quo method in portfolio comparison literature
    - Used by DeMiguel et al. (2009)
 
 References:
-- Jobson & Korkie (1981): Performance hypothesis testing
-- Memmel (2003): Correction to Jobson-Korkie test
-- DeMiguel et al. (2009): Out-of-sample evaluation protocol
+- Jobson & Korkie (1981): Performance hypothesis testing with the
+  Sharpe and Treynor measures. Journal of Finance, 36(4):889-908.
+- Memmel (2003): Performance hypothesis testing with the Sharpe ratio.
+  Finance Letters, 1:21-23.
+- DeMiguel et al. (2009): Optimal versus naive diversification.
+  Review of Financial Studies, 22(5):1915-1953.
 """
 
 import numpy as np
@@ -27,40 +28,71 @@ import os
 # ── Jobson-Korkie Test (Memmel 2003 correction) ───────────────────────────────
 
 def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
+    """
+    Jobson-Korkie (1981) test for equality of two Sharpe ratios,
+    with Memmel (2003) correction.
+
+    Tests H0: SR(r1) = SR(r2) against H1: SR(r1) != SR(r2).
+
+    Variance formula (Memmel 2003 corrected):
+        var = (1/T) * [2*(1-rho) + 0.5*SR1^2 + 0.5*SR2^2 - SR1*SR2*(1+rho)]
+
+    Note: var_diff can be negative when strategies are highly correlated
+    (e.g. identical series). The guard (var_diff <= 0 → z=0, p=1) is
+    mathematically necessary, not just defensive.
+
+    Args:
+        r1: monthly net excess returns for strategy 1 (GA)
+        r2: monthly net excess returns for strategy 2 (benchmark)
+
+    Returns:
+        dict with z-statistic, p-value, SR difference, annualized SRs
+    """
     T = len(r1)
     assert len(r2) == T, "Return series must have equal length"
 
+    # Sample moments
     mu1, mu2 = r1.mean(), r2.mean()
     s1,  s2  = r1.std(ddof=1), r2.std(ddof=1)
     s12      = np.cov(r1, r2, ddof=1)[0, 1]
 
-    sr1 = mu1 / s1 if s1 > 0 else 0.0
-    sr2 = mu2 / s2 if s2 > 0 else 0.0
+    # Guard against degenerate inputs
+    if s1 <= 0 or s2 <= 0:
+        return {
+            "sr1_ann": 0.0, "sr2_ann": 0.0, "sr_diff_ann": 0.0,
+            "z_stat": 0.0, "p_value": 1.0, "significant": False,
+        }
 
-    rho = s12 / (s1 * s2) if (s1 * s2) > 0 else 0.0
+    # Monthly Sharpe ratios (annualisation applied to output only)
+    sr1 = mu1 / s1
+    sr2 = mu2 / s2
 
+    # Correlation between the two return series
+    rho = s12 / (s1 * s2)
+    rho = np.clip(rho, -1.0, 1.0)  # numerical safety
+
+    # Memmel (2003) corrected variance of (SR1 - SR2)
+    # When rho=1 and sr1=sr2, this is negative → handled by guard below
     var_diff = (1 / T) * (
-        2
-        - 2 * rho * sr1 * sr2
+        2 * (1 - rho)
         + 0.5 * sr1 ** 2
         + 0.5 * sr2 ** 2
-        - sr1 * sr2 * (rho ** 2 + 0.5)
+        - sr1 * sr2 * (1 + rho)
     )
 
+    # Guard: var_diff <= 0 implies strategies are indistinguishable
     if var_diff <= 0:
         z_stat  = 0.0
         p_value = 1.0
     else:
         z_stat  = (sr1 - sr2) / np.sqrt(var_diff)
-        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))  # two-tailed
 
     sqrt12  = np.sqrt(12)
-    sr1_ann = sr1 * sqrt12
-    sr2_ann = sr2 * sqrt12
 
     return {
-        "sr1_ann"    : sr1_ann,
-        "sr2_ann"    : sr2_ann,
+        "sr1_ann"    : sr1 * sqrt12,
+        "sr2_ann"    : sr2 * sqrt12,
         "sr_diff_ann": (sr1 - sr2) * sqrt12,
         "z_stat"     : z_stat,
         "p_value"    : p_value,
@@ -71,6 +103,18 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
 # ── Paired t-test ─────────────────────────────────────────────────────────────
 
 def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
+    """
+    Paired t-test on monthly net excess return differences.
+
+    Tests H0: mean(r1 - r2) = 0 against H1: mean(r1 - r2) != 0.
+
+    Args:
+        r1: monthly net excess returns for strategy 1 (GA)
+        r2: monthly net excess returns for strategy 2 (benchmark)
+
+    Returns:
+        dict with t-statistic, p-value, mean difference (annualized)
+    """
     diff            = r1 - r2
     t_stat, p_value = stats.ttest_1samp(diff, popmean=0)
 
@@ -90,12 +134,17 @@ def run_significance_tests(
     mvo_unc_path : str = "results/benchmarks/mvo_unconstrained.parquet",
     mvo_con_path : str = "results/benchmarks/mvo_constrained.parquet",
 ) -> None:
-
+    """
+    Run all significance tests and print results table.
+    Saves CSV to results/tables/significance_tests.csv.
+    """
+    # Load results
     ga      = pd.read_parquet(ga_path)
     ew      = pd.read_parquet(ew_path)
     mvo_unc = pd.read_parquet(mvo_unc_path)
     mvo_con = pd.read_parquet(mvo_con_path)
 
+    # Strict date alignment — all series must cover identical periods
     dates = ga["date"].values
     assert (ew["date"].values      == dates).all(), "Date mismatch: GA vs 1/N"
     assert (mvo_unc["date"].values == dates).all(), "Date mismatch: GA vs Unc MVO"
@@ -115,10 +164,11 @@ def run_significance_tests(
     print("\n" + "="*70)
     print("STATISTICAL SIGNIFICANCE TESTS — GA vs Benchmarks")
     print("="*70)
-    print(f"Sample: {len(r_ga)} monthly observations "
+    print(f"Sample : {len(r_ga)} monthly observations "
           f"({ga['date'].min().date()} to {ga['date'].max().date()})")
-    print("Significance level: α = 0.05 (two-tailed)\n")
+    print("Alpha  : 0.05 (two-tailed)\n")
 
+    # ── Test 1: Paired t-test ─────────────────────────────────────────────────
     print("-"*70)
     print("TEST 1: Paired t-test on monthly net excess returns")
     print("H0: mean(GA return) - mean(benchmark return) = 0")
@@ -135,6 +185,7 @@ def run_significance_tests(
         print(f"{label:<30} {res['mean_diff_ann']*100:>15.2f}% "
               f"{res['t_stat']:>10.3f} {res['p_value']:>10.4f} {sig:>6}")
 
+    # ── Test 2: Jobson-Korkie ─────────────────────────────────────────────────
     print("\n" + "-"*70)
     print("TEST 2: Jobson-Korkie test (Memmel 2003 correction)")
     print("H0: Sharpe(GA) - Sharpe(benchmark) = 0")
@@ -152,6 +203,7 @@ def run_significance_tests(
               f"{res['sr_diff_ann']:>8.4f} {res['z_stat']:>8.3f} "
               f"{res['p_value']:>10.4f} {sig:>6}")
 
+    # ── Summary ───────────────────────────────────────────────────────────────
     print("\n" + "="*70)
     print("SUMMARY")
     print("="*70)
@@ -170,6 +222,7 @@ def run_significance_tests(
     print("clustering — results should be interpreted with this caveat.")
     print("="*70)
 
+    # ── Save ──────────────────────────────────────────────────────────────────
     os.makedirs("results/tables", exist_ok=True)
 
     rows = []

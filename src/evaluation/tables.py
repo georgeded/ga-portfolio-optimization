@@ -1,6 +1,6 @@
 """
 Thesis Tables
-Generates Table 1 (Main Performance Comparison) and saves as CSV and LaTeX.
+Generates Table 1 (Main Performance Comparison) and saves as CSV, LaTeX and PNG.
 
 Table 1 columns (all net of transaction costs):
 - Annualized Return
@@ -16,6 +16,7 @@ Reference: DeMiguel et al. (2009) — evaluation protocol
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import os
 
 SQRT_12 = np.sqrt(12)
@@ -33,7 +34,6 @@ COL_COST     = "Avg Transaction Cost"
 COLUMNS = [COL_RETURN, COL_VOL, COL_SHARPE, COL_SORTINO,
            COL_MDD, COL_TURNOVER, COL_COST]
 
-# LaTeX column header mapping
 COL_LATEX = {
     COL_RETURN  : "Ann. Return",
     COL_VOL     : "Ann. Vol.",
@@ -53,14 +53,10 @@ def compute_table1_metrics(df: pd.DataFrame) -> dict:
     rf  = df["rf"].values
     to  = df["turnover"].values
 
-    # Annualized return and volatility
     ann_ret = float(np.mean(net) * 12)
     ann_vol = float(np.std(net, ddof=1) * SQRT_12)
+    sharpe  = ann_ret / ann_vol if ann_vol > 0 else 0.0
 
-    # Sharpe ratio (net)
-    sharpe = ann_ret / ann_vol if ann_vol > 0 else 0.0
-
-    # Sortino ratio (net) — downside deviation using returns below zero
     downside = net[net < 0]
     if len(downside) > 0:
         dd_vol  = float(np.sqrt(np.mean(downside ** 2)) * SQRT_12)
@@ -68,12 +64,10 @@ def compute_table1_metrics(df: pd.DataFrame) -> dict:
     else:
         sortino = 0.0
 
-    # Max drawdown (net) — computed on total return for correct compounding
     cum  = np.cumprod(1 + net + rf)
     peak = np.maximum.accumulate(cum)
     mdd  = float(np.min((cum - peak) / peak))
 
-    # Turnover and cost — use stored simulation values for consistency
     avg_to   = float(np.mean(to))
     avg_cost = float(df["cost"].mean())
 
@@ -137,12 +131,8 @@ def print_table1(fmt: pd.DataFrame) -> None:
 
 
 def to_latex(fmt: pd.DataFrame) -> str:
-    """
-    Generate LaTeX table string for thesis inclusion.
-    Formatted for ACM style — compatible with booktabs.
-    """
+    """Generate LaTeX table string for thesis inclusion."""
     fmt_latex = fmt.rename(columns=COL_LATEX)
-
     return fmt_latex.to_latex(
         caption=(
             "Main performance comparison (net of transaction costs, "
@@ -157,6 +147,43 @@ def to_latex(fmt: pd.DataFrame) -> str:
     )
 
 
+def to_png(fmt: pd.DataFrame, path: str) -> None:
+    """
+    Save formatted table as a PNG image.
+    Clean white background, no axes — ready for thesis or slides.
+    """
+    n_rows, n_cols = fmt.shape
+    fig_w = 2 + n_cols * 1.6
+    fig_h = 0.5 + n_rows * 0.45
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.axis("off")
+
+    tbl = ax.table(
+        cellText  = fmt.values,
+        rowLabels = fmt.index.tolist(),
+        colLabels = fmt.columns.tolist(),
+        cellLoc   = "center",
+        rowLoc    = "left",
+        loc       = "center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.auto_set_column_width(col=list(range(-1, n_cols)))
+
+    for (row, col), cell in tbl.get_celld().items():
+        if row == 0 or col == -1:
+            cell.set_facecolor("#222222")
+            cell.set_text_props(color="white", fontweight="bold")
+        else:
+            cell.set_facecolor("#f9f9f9" if row % 2 == 0 else "white")
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {path}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -168,16 +195,15 @@ if __name__ == "__main__":
 
     print_table1(fmt)
 
-    # Raw values CSV
     table.to_csv(f"{OUT_DIR}/table1_performance.csv")
     print(f"\nSaved: {OUT_DIR}/table1_performance.csv")
 
-    # Formatted CSV
     fmt.to_csv(f"{OUT_DIR}/table1_performance_formatted.csv")
     print(f"Saved: {OUT_DIR}/table1_performance_formatted.csv")
 
-    # LaTeX
     latex = to_latex(fmt)
     with open(f"{OUT_DIR}/table1_performance.tex", "w") as f:
         f.write(latex)
     print(f"Saved: {OUT_DIR}/table1_performance.tex")
+
+    to_png(fmt, f"{OUT_DIR}/table1_performance.png")

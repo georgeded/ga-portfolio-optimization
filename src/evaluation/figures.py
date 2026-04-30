@@ -46,8 +46,16 @@ STYLES = {
     "1/N"              : {"color": "#bbbbbb", "lw": 1.5, "ls": ":",  "zorder": 2},
 }
 
-OUT_DIR = "results/figures"
+OUT_DIR    = "results/figures"
 LEGEND_LOC = "upper right"
+
+# Crisis periods — applied consistently across all time-series figures
+CRISES = [
+    {"start": "2008-09-01", "end": "2009-06-01",
+     "color": "black", "label": "GFC (2008–09)"},
+    {"start": "2020-02-01", "end": "2020-04-01",
+     "color": "grey",  "label": "COVID (2020)"},
+]
 
 
 # ── Data Loading ──────────────────────────────────────────────────────────────
@@ -107,6 +115,22 @@ def smooth_series(series: pd.Series, window: int = 6) -> pd.Series:
     return series.rolling(window).mean().dropna()
 
 
+def add_crisis_shading(ax, include_legend: bool = True) -> None:
+    """
+    Add shaded crisis periods to a time-series axes object.
+    Applied consistently across all time-series figures.
+    """
+    for crisis in CRISES:
+        ax.axvspan(
+            pd.Timestamp(crisis["start"]),
+            pd.Timestamp(crisis["end"]),
+            alpha=0.08,
+            color=crisis["color"],
+            label=crisis["label"] if include_legend else None,
+            zorder=1,
+        )
+
+
 # ── F1: Cumulative Returns ────────────────────────────────────────────────────
 
 def plot_cumulative_returns(data: dict) -> None:
@@ -116,14 +140,7 @@ def plot_cumulative_returns(data: dict) -> None:
         cum = cumulative_returns(df)
         ax.plot(df["date"], cum, label=name, **STYLES[name])
 
-    ax.axvspan(
-        pd.Timestamp("2008-09-01"), pd.Timestamp("2009-06-01"),
-        alpha=0.08, color="black", label="GFC (2008–09)"
-    )
-    ax.axvspan(
-        pd.Timestamp("2020-02-01"), pd.Timestamp("2020-04-01"),
-        alpha=0.08, color="grey", label="COVID (2020)"
-    )
+    add_crisis_shading(ax, include_legend=True)
 
     ax.set_title("Figure 1: Cumulative Net Portfolio Value (2005–2025)")
     ax.set_xlabel("Date")
@@ -147,14 +164,7 @@ def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
         ax.plot(rs.index, rs.values, label=name, **STYLES[name])
 
     ax.axhline(0, color="black", lw=0.8, ls="-", alpha=0.5)
-    ax.axvspan(
-        pd.Timestamp("2008-09-01"), pd.Timestamp("2009-06-01"),
-        alpha=0.08, color="black"
-    )
-    ax.axvspan(
-        pd.Timestamp("2020-02-01"), pd.Timestamp("2020-04-01"),
-        alpha=0.08, color="grey"
-    )
+    add_crisis_shading(ax, include_legend=True)
 
     ax.set_title(f"Figure 2: Rolling {window}-Month Sharpe Ratio (net, annualized)")
     ax.set_xlabel("Date")
@@ -179,6 +189,8 @@ def plot_turnover(data: dict) -> None:
         to_smooth = smooth_series(to, window=6)  # NaNs dropped
         ax.plot(to_smooth.index, to_smooth.values, label=name, **STYLES[name])
 
+    add_crisis_shading(ax, include_legend=True)
+
     ax.set_title("Figure 3: Monthly Portfolio Turnover (6-month rolling avg)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Turnover (%)")
@@ -200,6 +212,8 @@ def plot_hhi(data: dict) -> None:
         hhi = pd.Series(df["hhi"].values, index=df["date"])
         hhi_smooth = smooth_series(hhi, window=6)  # NaNs dropped
         ax.plot(hhi_smooth.index, hhi_smooth.values, label=name, **STYLES[name])
+
+    add_crisis_shading(ax, include_legend=True)
 
     ax.set_title("Figure 4: Portfolio Concentration — HHI (6-month rolling avg)")
     ax.set_xlabel("Date")
@@ -230,6 +244,8 @@ def plot_cardinality(data: dict) -> None:
 
     ax.axhline(df["n_stocks"].mean(), color="#666666", lw=1.2, ls="--",
                label=f"Mean K = {df['n_stocks'].mean():.1f}")
+
+    add_crisis_shading(ax, include_legend=True)
 
     ax.set_title("Figure 5: GA Selected Portfolio Size (K) Over Time")
     ax.set_xlabel("Date")

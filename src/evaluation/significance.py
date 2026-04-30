@@ -21,8 +21,24 @@ References:
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy import stats
 import os
+
+OUT_DIR = "results/tables"
+
+# ── Column name constants ─────────────────────────────────────────────────────
+COL_COMPARISON  = "Comparison"
+COL_MEAN_DIFF   = "Mean Diff (ann.)"
+COL_T_STAT      = "t-stat"
+COL_T_PVAL      = "t p-value"
+COL_T_SIG       = "t Sig."
+COL_SR_GA       = "SR(GA)"
+COL_SR_BENCH    = "SR(Bench)"
+COL_SR_DIFF     = "SR Diff"
+COL_Z_STAT      = "z-stat"
+COL_JK_PVAL     = "JK p-value"
+COL_JK_SIG      = "JK Sig."
 
 
 # ── Jobson-Korkie Test (Memmel 2003 correction) ───────────────────────────────
@@ -32,47 +48,29 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     Jobson-Korkie (1981) test for equality of two Sharpe ratios,
     with Memmel (2003) correction.
 
-    Tests H0: SR(r1) = SR(r2) against H1: SR(r1) != SR(r2).
-
     Variance formula (Memmel 2003 corrected):
         var = (1/T) * [2*(1-rho) + 0.5*SR1^2 + 0.5*SR2^2 - SR1*SR2*(1+rho)]
 
-    Note: var_diff can be negative when strategies are highly correlated
-    (e.g. identical series). The guard (var_diff <= 0 → z=0, p=1) is
-    mathematically necessary, not just defensive.
-
-    Args:
-        r1: monthly net excess returns for strategy 1 (GA)
-        r2: monthly net excess returns for strategy 2 (benchmark)
-
-    Returns:
-        dict with z-statistic, p-value, SR difference, annualized SRs
+    Note: var_diff can be negative when strategies are highly correlated.
+    The guard (var_diff <= 0 → z=0, p=1) is mathematically necessary.
     """
     T = len(r1)
     assert len(r2) == T, "Return series must have equal length"
 
-    # Sample moments
     mu1, mu2 = r1.mean(), r2.mean()
     s1,  s2  = r1.std(ddof=1), r2.std(ddof=1)
     s12      = np.cov(r1, r2, ddof=1)[0, 1]
 
-    # Guard against degenerate inputs
     if s1 <= 0 or s2 <= 0:
         return {
             "sr1_ann": 0.0, "sr2_ann": 0.0, "sr_diff_ann": 0.0,
             "z_stat": 0.0, "p_value": 1.0, "significant": False,
         }
 
-    # Monthly Sharpe ratios (annualisation applied to output only)
     sr1 = mu1 / s1
     sr2 = mu2 / s2
+    rho = np.clip(s12 / (s1 * s2), -1.0, 1.0)
 
-    # Correlation between the two return series
-    rho = s12 / (s1 * s2)
-    rho = np.clip(rho, -1.0, 1.0)  # numerical safety
-
-    # Memmel (2003) corrected variance of (SR1 - SR2)
-    # When rho=1 and sr1=sr2, this is negative → handled by guard below
     var_diff = (1 / T) * (
         2 * (1 - rho)
         + 0.5 * sr1 ** 2
@@ -80,16 +78,14 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
         - sr1 * sr2 * (1 + rho)
     )
 
-    # Guard: var_diff <= 0 implies strategies are indistinguishable
     if var_diff <= 0:
         z_stat  = 0.0
         p_value = 1.0
     else:
         z_stat  = (sr1 - sr2) / np.sqrt(var_diff)
-        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))  # two-tailed
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-    sqrt12  = np.sqrt(12)
-
+    sqrt12 = np.sqrt(12)
     return {
         "sr1_ann"    : sr1 * sqrt12,
         "sr2_ann"    : sr2 * sqrt12,
@@ -103,21 +99,9 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
 # ── Paired t-test ─────────────────────────────────────────────────────────────
 
 def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
-    """
-    Paired t-test on monthly net excess return differences.
-
-    Tests H0: mean(r1 - r2) = 0 against H1: mean(r1 - r2) != 0.
-
-    Args:
-        r1: monthly net excess returns for strategy 1 (GA)
-        r2: monthly net excess returns for strategy 2 (benchmark)
-
-    Returns:
-        dict with t-statistic, p-value, mean difference (annualized)
-    """
+    """Paired t-test on monthly net excess return differences."""
     diff            = r1 - r2
     t_stat, p_value = stats.ttest_1samp(diff, popmean=0)
-
     return {
         "mean_diff_ann": diff.mean() * 12,
         "t_stat"       : t_stat,
@@ -126,25 +110,23 @@ def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
     }
 
 
-# ── Main Comparison ───────────────────────────────────────────────────────────
+# ── Build Table 2 ─────────────────────────────────────────────────────────────
 
-def run_significance_tests(
+def build_table2(
     ga_path      : str = "results/ga/ga_results.parquet",
     ew_path      : str = "results/benchmarks/equal_weight_full.parquet",
     mvo_unc_path : str = "results/benchmarks/mvo_unconstrained.parquet",
     mvo_con_path : str = "results/benchmarks/mvo_constrained.parquet",
-) -> None:
+) -> tuple:
     """
-    Run all significance tests and print results table.
-    Saves CSV to results/tables/significance_tests.csv.
+    Run all significance tests and return raw + formatted DataFrames.
+    Returns: (raw_df, fmt_df)
     """
-    # Load results
     ga      = pd.read_parquet(ga_path)
     ew      = pd.read_parquet(ew_path)
     mvo_unc = pd.read_parquet(mvo_unc_path)
     mvo_con = pd.read_parquet(mvo_con_path)
 
-    # Strict date alignment — all series must cover identical periods
     dates = ga["date"].values
     assert (ew["date"].values      == dates).all(), "Date mismatch: GA vs 1/N"
     assert (mvo_unc["date"].values == dates).all(), "Date mismatch: GA vs Unc MVO"
@@ -161,93 +143,142 @@ def run_significance_tests(
         "GA vs Constrained MVO"  : r_mvo_con,
     }
 
-    print("\n" + "="*70)
-    print("STATISTICAL SIGNIFICANCE TESTS — GA vs Benchmarks")
-    print("="*70)
-    print(f"Sample : {len(r_ga)} monthly observations "
-          f"({ga['date'].min().date()} to {ga['date'].max().date()})")
-    print("Alpha  : 0.05 (two-tailed)\n")
-
-    # ── Test 1: Paired t-test ─────────────────────────────────────────────────
-    print("-"*70)
-    print("TEST 1: Paired t-test on monthly net excess returns")
-    print("H0: mean(GA return) - mean(benchmark return) = 0")
-    print("-"*70)
-    print(f"{'Comparison':<30} {'Mean Diff (ann)':>16} {'t-stat':>10} "
-          f"{'p-value':>10} {'Sig':>6}")
-    print("-"*70)
-
-    ttest_results = {}
-    for label, r_bench in benchmarks.items():
-        res = paired_ttest(r_ga, r_bench)
-        ttest_results[label] = res
-        sig = "✓" if res["significant"] else "✗"
-        print(f"{label:<30} {res['mean_diff_ann']*100:>15.2f}% "
-              f"{res['t_stat']:>10.3f} {res['p_value']:>10.4f} {sig:>6}")
-
-    # ── Test 2: Jobson-Korkie ─────────────────────────────────────────────────
-    print("\n" + "-"*70)
-    print("TEST 2: Jobson-Korkie test (Memmel 2003 correction)")
-    print("H0: Sharpe(GA) - Sharpe(benchmark) = 0")
-    print("-"*70)
-    print(f"{'Comparison':<30} {'SR(GA)':>8} {'SR(bench)':>10} "
-          f"{'SR Diff':>8} {'z-stat':>8} {'p-value':>10} {'Sig':>6}")
-    print("-"*70)
-
-    jk_results = {}
-    for label, r_bench in benchmarks.items():
-        res = jobson_korkie_test(r_ga, r_bench)
-        jk_results[label] = res
-        sig = "✓" if res["significant"] else "✗"
-        print(f"{label:<30} {res['sr1_ann']:>8.4f} {res['sr2_ann']:>10.4f} "
-              f"{res['sr_diff_ann']:>8.4f} {res['z_stat']:>8.3f} "
-              f"{res['p_value']:>10.4f} {sig:>6}")
-
-    # ── Summary ───────────────────────────────────────────────────────────────
-    print("\n" + "="*70)
-    print("SUMMARY")
-    print("="*70)
-    for label in benchmarks:
-        tt = ttest_results[label]
-        jk = jk_results[label]
-        print(f"\n{label}:")
-        print(f"  Paired t-test : p={tt['p_value']:.4f} "
-              f"({'significant' if tt['significant'] else 'not significant'} at α=0.05)")
-        print(f"  Jobson-Korkie : p={jk['p_value']:.4f} "
-              f"({'significant' if jk['significant'] else 'not significant'} at α=0.05)")
-
-    print("\n" + "="*70)
-    print("NOTE: Jobson-Korkie assumes normally distributed, i.i.d. returns.")
-    print("Financial returns typically exhibit heavier tails and volatility")
-    print("clustering — results should be interpreted with this caveat.")
-    print("="*70)
-
-    # ── Save ──────────────────────────────────────────────────────────────────
-    os.makedirs("results/tables", exist_ok=True)
-
     rows = []
     for label, r_bench in benchmarks.items():
-        tt = ttest_results[label]
-        jk = jk_results[label]
+        tt = paired_ttest(r_ga, r_bench)
+        jk = jobson_korkie_test(r_ga, r_bench)
         rows.append({
-            "comparison"    : label,
-            "mean_diff_ann" : tt["mean_diff_ann"],
-            "t_stat"        : tt["t_stat"],
-            "t_pvalue"      : tt["p_value"],
-            "t_significant" : tt["significant"],
-            "sr_ga_ann"     : jk["sr1_ann"],
-            "sr_bench_ann"  : jk["sr2_ann"],
-            "sr_diff_ann"   : jk["sr_diff_ann"],
-            "jk_z_stat"     : jk["z_stat"],
-            "jk_pvalue"     : jk["p_value"],
-            "jk_significant": jk["significant"],
+            COL_COMPARISON : label,
+            COL_MEAN_DIFF  : tt["mean_diff_ann"],
+            COL_T_STAT     : tt["t_stat"],
+            COL_T_PVAL     : tt["p_value"],
+            COL_T_SIG      : tt["significant"],
+            COL_SR_GA      : jk["sr1_ann"],
+            COL_SR_BENCH   : jk["sr2_ann"],
+            COL_SR_DIFF    : jk["sr_diff_ann"],
+            COL_Z_STAT     : jk["z_stat"],
+            COL_JK_PVAL    : jk["p_value"],
+            COL_JK_SIG     : jk["significant"],
         })
 
-    pd.DataFrame(rows).to_csv(
-        "results/tables/significance_tests.csv", index=False
-    )
-    print("\nSaved: results/tables/significance_tests.csv")
+    raw = pd.DataFrame(rows).set_index(COL_COMPARISON)
 
+    # Formatted version
+    fmt = raw.copy()
+    fmt[COL_MEAN_DIFF] = (raw[COL_MEAN_DIFF] * 100).map("{:.2f}%".format)
+    fmt[COL_T_STAT]    = raw[COL_T_STAT].map("{:.3f}".format)
+    fmt[COL_T_PVAL]    = raw[COL_T_PVAL].map("{:.4f}".format)
+    fmt[COL_T_SIG]     = raw[COL_T_SIG].map(lambda x: "✓" if x else "✗")
+    fmt[COL_SR_GA]     = raw[COL_SR_GA].map("{:.4f}".format)
+    fmt[COL_SR_BENCH]  = raw[COL_SR_BENCH].map("{:.4f}".format)
+    fmt[COL_SR_DIFF]   = raw[COL_SR_DIFF].map("{:.4f}".format)
+    fmt[COL_Z_STAT]    = raw[COL_Z_STAT].map("{:.3f}".format)
+    fmt[COL_JK_PVAL]   = raw[COL_JK_PVAL].map("{:.4f}".format)
+    fmt[COL_JK_SIG]    = raw[COL_JK_SIG].map(lambda x: "✓" if x else "✗")
+
+    return raw, fmt
+
+
+# ── Print ─────────────────────────────────────────────────────────────────────
+
+def print_table2(fmt: pd.DataFrame) -> None:
+    print("\n" + "="*80)
+    print("TABLE 2 — Statistical Significance of Performance Differences")
+    print("="*80)
+    print("Sample: 252 monthly observations | α = 0.05 (two-tailed)\n")
+
+    print("TEST 1: Paired t-test (H0: mean return difference = 0)")
+    print(fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG]].to_string())
+
+    print("\nTEST 2: Jobson-Korkie (Memmel 2003) (H0: Sharpe difference = 0)")
+    print(fmt[[COL_SR_GA, COL_SR_BENCH, COL_SR_DIFF,
+               COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]].to_string())
+
+    print("\nNOTE: JK assumes i.i.d. normal returns — interpret with caution.")
+    print("="*80)
+
+
+# ── PNG ───────────────────────────────────────────────────────────────────────
+
+def to_png(fmt: pd.DataFrame, path: str) -> None:
+    """Save Table 2 as a PNG image."""
+    display = fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG,
+                   COL_SR_GA, COL_SR_BENCH, COL_SR_DIFF,
+                   COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]].copy()
+
+    n_rows, n_cols = display.shape
+    fig_w = 2 + n_cols * 1.3
+    fig_h = 0.5 + n_rows * 0.5
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.axis("off")
+
+    tbl = ax.table(
+        cellText  = display.values,
+        rowLabels = display.index.tolist(),
+        colLabels = display.columns.tolist(),
+        cellLoc   = "center",
+        rowLoc    = "left",
+        loc       = "center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    tbl.auto_set_column_width(col=list(range(-1, n_cols)))
+
+    for (row, col), cell in tbl.get_celld().items():
+        if row == 0 or col == -1:
+            cell.set_facecolor("#222222")
+            cell.set_text_props(color="white", fontweight="bold")
+        else:
+            cell.set_facecolor("#f9f9f9" if row % 2 == 0 else "white")
+
+    fig.tight_layout()
+    fig.savefig(path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {path}")
+
+
+# ── LaTeX ─────────────────────────────────────────────────────────────────────
+
+def to_latex(fmt: pd.DataFrame) -> str:
+    """Generate LaTeX table for thesis inclusion."""
+    display = fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG,
+                   COL_SR_DIFF, COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]]
+    return display.to_latex(
+        caption=(
+            "Statistical significance of GA performance differences "
+            "vs benchmarks (January 2005--December 2025, $T=252$). "
+            "Paired $t$-test: $H_0$: mean return difference $= 0$. "
+            "Jobson--Korkie (Memmel 2003): $H_0$: Sharpe difference $= 0$. "
+            "$\\alpha = 0.05$ (two-tailed). "
+            "JK assumes i.i.d.\\ normal returns."
+        ),
+        label="tab:significance",
+        column_format="l" + "r" * display.shape[1],
+        escape=False,
+        bold_rows=False,
+    )
+
+
+# ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    run_significance_tests()
+    os.makedirs(OUT_DIR, exist_ok=True)
+
+    print("Running significance tests...")
+    raw, fmt = build_table2()
+
+    print_table2(fmt)
+
+    raw.to_csv(f"{OUT_DIR}/significance_tests.csv")
+    print(f"\nSaved: {OUT_DIR}/significance_tests.csv")
+
+    fmt.to_csv(f"{OUT_DIR}/significance_tests_formatted.csv")
+    print(f"Saved: {OUT_DIR}/significance_tests_formatted.csv")
+
+    latex = to_latex(fmt)
+    with open(f"{OUT_DIR}/table2_significance.tex", "w") as f:
+        f.write(latex)
+    print(f"Saved: {OUT_DIR}/table2_significance.tex")
+
+    to_png(fmt, f"{OUT_DIR}/table2_significance.png")

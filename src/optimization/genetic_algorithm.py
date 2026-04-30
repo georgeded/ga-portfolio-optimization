@@ -513,7 +513,8 @@ def run_ga(n_assets:     int,
            mu:           np.ndarray,
            sigma:        np.ndarray,
            prev_weights: np.ndarray | None,
-           rng:          np.random.Generator) -> np.ndarray:
+           rng:          np.random.Generator,
+           return_history: bool = False) -> np.ndarray:
     """
     Full generational GA with elitism, local refinement, and early stopping.
  
@@ -549,6 +550,7 @@ def run_ga(n_assets:     int,
     best_ever_w = population[best_idx].copy()
     best_ever_f = fitnesses[best_idx]
     stagnation  = 0
+    fitness_history = []
  
     # ── Generation loop ───────────────────────────────────────────────────────
     for _ in range(N_GENS):
@@ -604,8 +606,11 @@ def run_ga(n_assets:     int,
             stagnation  = 0
         else:
             stagnation += 1
- 
+
+        fitness_history.append(best_ever_f)
         if stagnation >= EARLY_STOP:
             break
  
+    if return_history:
+        return best_ever_w, fitness_history
     return best_ever_w

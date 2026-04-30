@@ -1,23 +1,32 @@
 """
-Appendix Figure A1 — GA Convergence Plot
+Appendix Figure A1 — GA Convergence Plot (Tuned vs Default Parameters)
 
 Runs the GA with return_history=True at 3 representative rebalancing dates:
 - Pre-crisis : 2007-01-01
 - Post-crisis: 2010-01-01
 - Recent     : 2020-01-01
 
-For each date, runs N_RUNS_CONV independent GA instances and plots the
-median best-fitness trajectory across runs, with IQR band showing dispersion.
+Two parameter configurations are compared:
+1. Tuned: Optuna-optimised parameters (best_params.json)
+2. Default: standard EA defaults (pc=0.8, pm=0.1, sigma_m=0.05, lambda=0.0)
 
-Purpose: confirms 200 generations is sufficient for convergence and that
-early stopping does not terminate prematurely.
+IMPORTANT — fitness interpretation:
+    All runs use prev_weights=None. Since turnover is only computed when
+    prev_weights is not None, the turnover penalty λ·turnover = 0 for all
+    runs regardless of λ. Fitness therefore equals pure in-sample Sharpe
+    in all configurations. The comparison isolates the effect of crossover
+    rate (pc), mutation rate (pm), and mutation step size (sigma_m) only.
+    λ is intentionally excluded from this diagnostic.
 
-Note: prev_weights=None is used for all dates, so fitness reflects
-in-sample Sharpe without turnover penalty. This is appropriate for a
-convergence diagnostic but differs slightly from the main experiment
-where lambda * turnover is active.
+Outputs:
+- A1_convergence_tuned.png       — tuned parameters only
+- A1_convergence_default.png     — default parameters only
+- A1_convergence_comparison.png  — both overlaid per date (primary figure)
 
-Output: results/figures/A1_convergence.png
+Purpose:
+- Confirms 200 generations is sufficient for convergence
+- Shows that Optuna-tuned operator parameters (pc, pm, sigma_m) achieve
+  higher in-sample Sharpe than default parameters (supports RQ3 / H3)
 """
 
 import numpy as np
@@ -27,6 +36,7 @@ import os
 
 from src.utils.data import load_data
 from src.utils.portfolio import get_estimation_window
+from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga, N_GENS
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -34,16 +44,38 @@ REPR_DATES  = ["2007-01-01", "2010-01-01", "2020-01-01"]
 DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
                "Recent (Jan 2020)"]
-N_RUNS_CONV = 8    # runs per date — matches main experiment
-BASE_SEED   = 42   # matches runner.py
+N_RUNS_CONV = 8
+BASE_SEED   = 42
 OUT_DIR     = "results/figures"
+TUNED_LABEL = "Tuned (Optuna)"
 
-# Greyscale line styles — consistent with thesis figures
-LINE_STYLES = [
-    {"color": "#000000", "lw": 2.0, "ls": "-"},
-    {"color": "#555555", "lw": 1.8, "ls": "--"},
-    {"color": "#999999", "lw": 1.8, "ls": "-."},
-]
+# Tuned parameters (Optuna — best_params.json)
+TUNED_PARAMS = {
+    "pc"      : 0.6054,
+    "pm"      : 0.1370,
+    "sigma_m" : 0.1469,
+    "lambda_" : 1.8437,  # inactive in this diagnostic (prev_weights=None)
+    "label"   : TUNED_LABEL,
+}
+
+# Default parameters (standard EA literature defaults)
+DEFAULT_PARAMS = {
+    "pc"      : 0.8,
+    "pm"      : 0.1,
+    "sigma_m" : 0.05,
+    "lambda_" : 0.0,   # also inactive (prev_weights=None)
+    "label"   : "Default",
+}
+
+CONFIG_STYLES = {
+    TUNED_LABEL      : {"lw": 2.0, "ls": "-",  "alpha_band": 0.15},
+    "Default"       : {"lw": 1.6, "ls": "--", "alpha_band": 0.10},
+}
+
+DATE_COLORS = ["#000000", "#555555", "#999999"]
+
+# Y-axis label — explicit that λ is inactive and fitness = pure Sharpe
+YAXIS_LABEL = "In-sample Sharpe  (prev_weights=None, λ inactive)"
 
 plt.rcParams.update({
     "figure.dpi"       : 300,
@@ -62,34 +94,36 @@ plt.rcParams.update({
 })
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Core: run GA with overridden params ───────────────────────────────────────
 
-def run_convergence() -> None:
-    print("Loading data...")
-    universe, returns = load_data()
+def run_convergence_for_config(mu:       np.ndarray,
+                               sigma:    np.ndarray,
+                               n_assets: int,
+                               params:   dict) -> tuple:
+    """
+    Run N_RUNS_CONV GA instances with the given parameter config.
+    Temporarily overrides module-level constants in genetic_algorithm.py.
+    Restores originals after run — no side effects on other modules.
 
-    fig, ax = plt.subplots(figsize=(10, 5))
+    prev_weights=None throughout: turnover penalty is inactive,
+    fitness = pure in-sample Sharpe for all runs.
 
-    for date_str, label, style in zip(REPR_DATES, DATE_LABELS, LINE_STYLES):
-        t = pd.Timestamp(date_str)
+    Returns:
+        (median_traj, q25, q75, generations, median_stop)
+    """
+    # Save originals
+    orig_pc      = ga_module.PC
+    orig_pm      = ga_module.PM
+    orig_sigma_m = ga_module.SIGMA_M
+    orig_lambda  = ga_module.LAMBDA
 
-        # Get eligible universe at this date
-        eligible = universe[universe["date"] == t]["permno"].tolist()
-        if len(eligible) == 0:
-            print(f"WARNING: No eligible stocks at {date_str}, skipping.")
-            continue
+    # Override
+    ga_module.PC      = params["pc"]
+    ga_module.PM      = params["pm"]
+    ga_module.SIGMA_M = params["sigma_m"]
+    ga_module.LAMBDA  = params["lambda_"]
 
-        # Build estimation window — identical to main runner
-        mu, sigma, valid_permnos = get_estimation_window(returns, eligible, t)
-        if mu is None or len(valid_permnos) < 2:
-            print(f"WARNING: Estimation window failed at {date_str}, skipping.")
-            continue
-
-        n_assets = len(valid_permnos)
-        print(f"\n{label}: N={n_assets} stocks, "
-              f"running {N_RUNS_CONV} GA instances...")
-
-        # Run N_RUNS_CONV independent GA instances with history
+    try:
         all_histories = []
         for run_i in range(N_RUNS_CONV):
             rng = np.random.default_rng(BASE_SEED + run_i)
@@ -97,55 +131,170 @@ def run_convergence() -> None:
                 n_assets       = n_assets,
                 mu             = mu,
                 sigma          = sigma,
-                prev_weights   = None,  # no prior portfolio — see module note
+                prev_weights   = None,  # λ inactive — see module docstring
                 rng            = rng,
                 return_history = True,
             )
             all_histories.append(history)
-            print(f"  Run {run_i+1}/{N_RUNS_CONV}: "
-                  f"{len(history)} generations, "
-                  f"best fitness = {history[-1]:.4f}")
 
-        # Pad histories to same length with final value.
-        # Runs that early-stopped have genuinely converged — padding
-        # reflects that best fitness does not change after stopping.
-        max_len = max(len(h) for h in all_histories)
-        padded  = np.array([
-            h + [h[-1]] * (max_len - len(h))
-            for h in all_histories
-        ])
+    finally:
+        # Always restore originals — even if run crashes
+        ga_module.PC      = orig_pc
+        ga_module.PM      = orig_pm
+        ga_module.SIGMA_M = orig_sigma_m
+        ga_module.LAMBDA  = orig_lambda
 
-        # Median trajectory and IQR band across runs
-        median_traj = np.median(padded, axis=0)
-        q25         = np.percentile(padded, 25, axis=0)
-        q75         = np.percentile(padded, 75, axis=0)
-        generations = np.arange(1, max_len + 1)
+    # Pad shorter runs with final value (early stopping → converged)
+    max_len = max(len(h) for h in all_histories)
+    padded  = np.array([
+        h + [h[-1]] * (max_len - len(h))
+        for h in all_histories
+    ])
 
-        # Median stopping generation (correct convergence diagnostic)
-        median_stop = int(np.median([len(h) for h in all_histories]))
+    median_traj = np.median(padded, axis=0)
+    q25         = np.percentile(padded, 25, axis=0)
+    q75         = np.percentile(padded, 75, axis=0)
+    generations = np.arange(1, max_len + 1)
+    median_stop = int(np.median([len(h) for h in all_histories]))
 
-        ax.plot(generations, median_traj, label=label, **style)
+    return median_traj, q25, q75, generations, median_stop
+
+
+# ── Plotting helpers ──────────────────────────────────────────────────────────
+
+def plot_single_config(results:    dict,
+                       config_lbl: str,
+                       filename:   str) -> None:
+    """Plot convergence for one parameter config across all 3 dates."""
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):
+        median_traj, q25, q75, generations, median_stop = \
+            results[config_lbl][date_str]
+        color = DATE_COLORS[i]
+        style = CONFIG_STYLES[config_lbl]
+
+        ax.plot(generations, median_traj,
+                color=color, lw=style["lw"], ls=style["ls"],
+                label=f"{date_label} (stop gen: {median_stop})")
         ax.fill_between(generations, q25, q75,
-                        alpha=0.15, color=style["color"])
-
-        print(f"  Median final fitness : {median_traj[-1]:.4f}")
-        print(f"  Median stopping gen  : {median_stop} / {N_GENS}")
-        print(f"  IQR at final gen     : [{q25[-1]:.4f}, {q75[-1]:.4f}]")
+                        alpha=style["alpha_band"], color=color)
 
     ax.set_title(
-        "Figure A1: GA Convergence — Best Fitness per Generation\n"
-        "(median ± IQR across 8 independent runs, 3 representative dates)"
+        f"Figure A1: GA Convergence — {config_lbl} Parameters\n"
+        f"(median ± IQR across {N_RUNS_CONV} independent runs)"
     )
     ax.set_xlabel("Generation")
-    ax.set_ylabel("Best Fitness  (Sharpe − λ·Turnover, in-sample)")
+    ax.set_ylabel(YAXIS_LABEL)
     ax.legend(loc="lower right", framealpha=0.9)
     fig.tight_layout()
-
-    os.makedirs(OUT_DIR, exist_ok=True)
-    out_path = f"{OUT_DIR}/A1_convergence.png"
+    out_path = f"{OUT_DIR}/{filename}"
     fig.savefig(out_path)
     plt.close(fig)
-    print(f"\nSaved: {out_path}")
+    print(f"Saved: {out_path}")
+
+
+def plot_comparison(results: dict) -> None:
+    """
+    Primary figure: tuned vs default overlaid, one subplot per date.
+    This is the key figure for RQ3 — isolates pc/pm/sigma_m effect.
+    """
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+
+    for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):
+        ax = axes[i]
+
+        for config_lbl in [TUNED_LABEL, "Default"]:
+            median_traj, q25, q75, generations, median_stop = \
+                results[config_lbl][date_str]
+            style = CONFIG_STYLES[config_lbl]
+            color = "#000000" if config_lbl == TUNED_LABEL else "#888888"
+
+            ax.plot(generations, median_traj,
+                    color=color, lw=style["lw"], ls=style["ls"],
+                    label=f"{config_lbl} (stop: {median_stop})")
+            ax.fill_between(generations, q25, q75,
+                            alpha=style["alpha_band"], color=color)
+
+        ax.set_title(date_label)
+        ax.set_xlabel("Generation")
+        if i == 0:
+            ax.set_ylabel(YAXIS_LABEL)
+        ax.legend(loc="lower right", framealpha=0.9, fontsize=9)
+
+    fig.suptitle(
+        "Figure A1: GA Convergence — Tuned vs Default Parameters\n"
+        f"(median ± IQR, {N_RUNS_CONV} runs; "
+        "fitness = in-sample Sharpe, λ inactive)",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    out_path = f"{OUT_DIR}/A1_convergence_comparison.png"
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved: {out_path}")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def run_convergence() -> None:
+    print("Loading data...")
+    universe, returns = load_data()
+
+    results = {
+        TUNED_PARAMS["label"]  : {},
+        DEFAULT_PARAMS["label"]: {},
+    }
+
+    for date_str, date_label in zip(REPR_DATES, DATE_LABELS):
+        t = pd.Timestamp(date_str)
+        print(f"\n{'='*60}")
+        print(f"Date: {date_label}")
+        print(f"{'='*60}")
+
+        eligible = universe[universe["date"] == t]["permno"].tolist()
+        if not eligible:
+            print(f"WARNING: No eligible stocks at {date_str}, skipping.")
+            continue
+
+        mu, sigma, valid_permnos = get_estimation_window(returns, eligible, t)
+        if mu is None:
+            print(f"WARNING: Estimation window failed at {date_str}, skipping.")
+            continue
+
+        n_assets = len(valid_permnos)
+        print(f"Universe: {n_assets} stocks")
+
+        for params in [TUNED_PARAMS, DEFAULT_PARAMS]:
+            lbl = params["label"]
+            print(f"\n  Running {lbl} "
+                  f"(pc={params['pc']}, pm={params['pm']}, "
+                  f"sigma_m={params['sigma_m']}) "
+                  f"[λ inactive — prev_weights=None]...")
+
+            median_traj, q25, q75, generations, median_stop = \
+                run_convergence_for_config(mu, sigma, n_assets, params)
+
+            results[lbl][date_str] = (
+                median_traj, q25, q75, generations, median_stop
+            )
+
+            print(f"    Median final fitness : {median_traj[-1]:.4f}")
+            print(f"    Median stopping gen  : {median_stop} / {N_GENS}")
+            print(f"    IQR at final gen     : "
+                  f"[{q25[-1]:.4f}, {q75[-1]:.4f}]")
+
+    os.makedirs(OUT_DIR, exist_ok=True)
+    print(f"\n{'='*60}")
+    print("Saving figures...")
+
+    plot_single_config(results, TUNED_PARAMS["label"],
+                       "A1_convergence_tuned.png")
+    plot_single_config(results, DEFAULT_PARAMS["label"],
+                       "A1_convergence_default.png")
+    plot_comparison(results)
+
+    print("\nAll convergence figures saved.")
 
 
 if __name__ == "__main__":

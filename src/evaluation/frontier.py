@@ -42,14 +42,14 @@ DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
                "Recent (Jan 2020)"]
 
-N_FRONTIER_POINTS = 50
+N_FRONTIER_POINTS = 200
 BASE_SEED         = 42
 OUT_DIR           = "results/figures"
 
 PORTFOLIO_STYLES = {
     "GA"               : {"marker": "*", "ms": 14, "color": "#000000", "zorder": 6},
     "Constrained MVO"  : {"marker": "s", "ms":  8, "color": "#444444", "zorder": 5},
-    "Unconstrained MVO": {"marker": "^", "ms":  8, "color": "#888888", "zorder": 4},
+    "Unconstrained MVO": {"marker": "D", "ms":  9, "color": "#333333", "zorder": 10},
     "1/N"              : {"marker": "o", "ms":  8, "color": "#bbbbbb", "zorder": 3},
 }
 
@@ -254,6 +254,8 @@ def run_frontier() -> None:
                 color  = s["color"],
                 zorder = s["zorder"],
                 label  = name,
+                edgecolor="black",
+                linewidth=0.6,
             )
 
         ax.set_title(label)

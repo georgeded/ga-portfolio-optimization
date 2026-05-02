@@ -8,18 +8,17 @@ For 3 representative rebalancing dates:
 
 At each date:
 1. Recompute mu and sigma from the 60-month estimation window
-2. Trace the efficient frontier via parametric sweep on the minimum
-   variance frontier (long-only constrained)
+2. Trace the efficient frontier via parametric sweep
 3. Overlay actual portfolio positions of GA, constrained MVO,
    unconstrained MVO, and 1/N as scatter points
 
-GA weights are obtained by running run_ga once at each representative
-date using the same parameters as the main experiment. This gives the
-exact GA weight vector, not an approximation.
+GA weights are obtained by running run_ga once at each date with a
+reduced generation budget (N_GENS_FRONTIER=50) for speed. This is
+illustrative only — the main experiment used 200 generations.
 
-Note: All frontier and portfolio positions use in-sample estimates
-(mu, sigma from the 60-month window). This figure is illustrative —
-out-of-sample performance is evaluated separately.
+Note: All positions use in-sample estimates (mu, sigma from 60-month
+window). This figure is illustrative — out-of-sample performance is
+evaluated separately.
 
 Output: results/figures/F6_frontier.png
 """
@@ -31,9 +30,10 @@ import matplotlib.lines as mlines
 from scipy.optimize import minimize
 import os
 
-from src.utils.portfolio import get_estimation_window, align_drifted_weights
+from src.utils.portfolio import get_estimation_window
 from src.utils.data import load_data
 from src.benchmarks.mvo import optimize_mvo
+from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -42,15 +42,20 @@ DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
                "Recent (Jan 2020)"]
 
-N_FRONTIER_POINTS = 200
+N_FRONTIER_POINTS = 30    # 30 points sufficient for smooth curve
+N_GENS_FRONTIER   = 50    # reduced from 200 — illustrative only
 BASE_SEED         = 42
 OUT_DIR           = "results/figures"
 
 PORTFOLIO_STYLES = {
-    "GA"               : {"marker": "*", "ms": 14, "color": "#000000", "zorder": 6},
-    "Constrained MVO"  : {"marker": "s", "ms":  8, "color": "#444444", "zorder": 5},
-    "Unconstrained MVO": {"marker": "D", "ms":  9, "color": "#333333", "zorder": 10},
-    "1/N"              : {"marker": "o", "ms":  8, "color": "#bbbbbb", "zorder": 3},
+    "GA"               : {"marker": "*", "ms": 14, "color": "#000000",
+                          "zorder": 6,  "offset_vol": 0.0, "offset_ret": 0.0},
+    "Constrained MVO"  : {"marker": "s", "ms":  8, "color": "#444444",
+                          "zorder": 5,  "offset_vol": 0.0, "offset_ret": 0.0},
+    "Unconstrained MVO": {"marker": "D", "ms":  9, "color": "#333333",
+                          "zorder": 10, "offset_vol": 0.4, "offset_ret": 0.8},
+    "1/N"              : {"marker": "o", "ms":  8, "color": "#bbbbbb",
+                          "zorder": 3,  "offset_vol": 0.0, "offset_ret": 0.0},
 }
 
 plt.rcParams.update({
@@ -76,11 +81,7 @@ def min_variance_portfolio(sigma:         np.ndarray,
                            target_return: float,
                            mu:            np.ndarray,
                            w_max:         float = 1.0) -> np.ndarray | None:
-    """
-    Minimum variance portfolio for a given target return.
-    Long-only: w >= 0, sum = 1, w <= w_max.
-    Returns None if infeasible.
-    """
+    """Minimum variance portfolio for a given target return."""
     N = len(mu)
     constraints = [
         {"type": "eq", "fun": lambda w: np.sum(w) - 1.0},
@@ -109,18 +110,14 @@ def compute_frontier(mu:       np.ndarray,
                      sigma:    np.ndarray,
                      n_points: int   = N_FRONTIER_POINTS,
                      w_max:    float = 1.0) -> tuple:
-    """
-    Trace the efficient frontier by sweeping target returns.
-    Returns annualized (vols, returns) arrays.
-    """
+    """Trace the efficient frontier. Returns annualized (vols, returns)."""
     r_min = mu.min()
-    r_max = mu.max() * 0.95   # cap slightly to avoid infeasibility at extremes
+    r_max = mu.max() * 0.95
 
-    target_returns = np.linspace(r_min, r_max, n_points)
-    frontier_vols  = []
-    frontier_rets  = []
+    frontier_vols = []
+    frontier_rets = []
 
-    for r_target in target_returns:
+    for r_target in np.linspace(r_min, r_max, n_points):
         w = min_variance_portfolio(sigma, r_target, mu, w_max)
         if w is not None:
             frontier_vols.append(float(np.sqrt(w @ sigma @ w)) * np.sqrt(12))
@@ -138,32 +135,36 @@ def portfolio_position(weights: np.ndarray,
     return vol, ret
 
 
-# ── Portfolio Weights at Each Date ────────────────────────────────────────────
+# ── Portfolio Weights ─────────────────────────────────────────────────────────
 
-def get_portfolio_weights(mu:            np.ndarray,
-                          sigma:         np.ndarray,
-                          n_assets:      int) -> dict:
+def get_portfolio_weights(mu:       np.ndarray,
+                          sigma:    np.ndarray,
+                          n_assets: int) -> dict:
     """
-    Compute actual portfolio weights for each strategy at a given date.
+    Compute portfolio weights for each strategy at a given date.
 
-    GA: single run_ga call using identical parameters to main experiment.
+    GA: single run_ga call with reduced N_GENS_FRONTIER=50 generations
+        (illustrative only — main experiment used 200 generations).
+        Module-level N_GENS is temporarily overridden and restored.
     MVO: optimize_mvo with same bounds as main experiment.
     1/N: equal weight.
-
-    All use prev_weights=None (no prior portfolio at representative dates).
-    This is consistent with the convergence diagnostic approach.
     """
     rng = np.random.default_rng(BASE_SEED)
 
-    # GA — exact weights from one run using main experiment parameters
-    print("    Running GA...")
-    ga_w = run_ga(
-        n_assets     = n_assets,
-        mu           = mu,
-        sigma        = sigma,
-        prev_weights = None,
-        rng          = rng,
-    )
+    # GA — exact weights, reduced generations for speed
+    print("    Running GA (50 gens — illustrative)...")
+    orig_n_gens    = ga_module.N_GENS
+    ga_module.N_GENS = N_GENS_FRONTIER
+    try:
+        ga_w = run_ga(
+            n_assets     = n_assets,
+            mu           = mu,
+            sigma        = sigma,
+            prev_weights = None,
+            rng          = rng,
+        )
+    finally:
+        ga_module.N_GENS = orig_n_gens  # always restore
 
     # MVO unconstrained
     print("    Running Unconstrained MVO...")
@@ -187,7 +188,7 @@ def get_portfolio_weights(mu:            np.ndarray,
         rng   = rng,
     )
 
-    # 1/N equal weight
+    # 1/N
     ew_w = np.ones(n_assets) / n_assets
 
     return {
@@ -230,7 +231,6 @@ def run_frontier() -> None:
         print("  Computing constrained frontier (w<=0.15)...")
         vols_con, rets_con = compute_frontier(mu, sigma, w_max=0.15)
 
-        # Plot frontiers
         if len(vols_unc) > 1:
             ax.plot(vols_unc * 100, rets_unc * 100,
                     color="#000000", lw=1.5, ls="-",
@@ -240,7 +240,7 @@ def run_frontier() -> None:
                     color="#666666", lw=1.5, ls="--",
                     label="Frontier (w ≤ 0.15)", zorder=2)
 
-        # Actual portfolio positions — exact weights for all strategies
+        # Portfolio positions
         print("  Computing portfolio positions...")
         weights = get_portfolio_weights(mu, sigma, n_assets)
 
@@ -248,14 +248,15 @@ def run_frontier() -> None:
             vol, ret = portfolio_position(w, mu, sigma)
             s = PORTFOLIO_STYLES[name]
             ax.scatter(
-                vol * 100, ret * 100,
-                marker = s["marker"],
-                s      = s["ms"] ** 2,
-                color  = s["color"],
-                zorder = s["zorder"],
-                label  = name,
-                edgecolor="black",
-                linewidth=0.6,
+                vol * 100 + s["offset_vol"],
+                ret * 100 + s["offset_ret"],
+                marker    = s["marker"],
+                s         = s["ms"] ** 2,
+                color     = s["color"],
+                zorder    = s["zorder"],
+                label     = name,
+                edgecolor = "black",
+                linewidth = 0.6,
             )
 
         ax.set_title(label)
@@ -272,10 +273,12 @@ def run_frontier() -> None:
     ]
     for name, s in PORTFOLIO_STYLES.items():
         handles.append(plt.scatter([], [],
-                                   marker=s["marker"],
-                                   s=s["ms"] ** 2,
-                                   color=s["color"],
-                                   label=name))
+                                   marker    = s["marker"],
+                                   s         = s["ms"] ** 2,
+                                   color     = s["color"],
+                                   edgecolors= "black",
+                                   linewidths= 0.6,
+                                   label     = name))
 
     fig.legend(handles=handles, loc="lower center",
                ncol=6, framealpha=0.9,

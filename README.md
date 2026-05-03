@@ -1,340 +1,223 @@
 # GA Portfolio Optimization
 
-A research-grade Python implementation of a **Genetic Algorithm (GA) for cardinality-constrained portfolio optimization**, developed as part of a BSc Computer Science thesis at Vrije Universiteit Amsterdam.
+**Genetic algorithm for cardinality-constrained portfolio optimization on US equities — BSc CS thesis, VU Amsterdam.**
 
-The project compares an evolutionary portfolio optimizer against classical mean-variance baselines and a naive diversification benchmark using a rolling-window, strictly out-of-sample evaluation on US equities.
+![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Institution](https://img.shields.io/badge/thesis-VU%20Amsterdam-purple)
+
+---
+
+## Results
+
+| Strategy | Sharpe (net) | Return (net) | Vol | Max DD | Avg Turnover |
+|---|---|---|---|---|---|
+| **GA (adaptive K)** | **0.8751** | **14.78%** | 16.89% | -38.16% | 21.8% |
+| Constrained MVO | 0.5557 | — | — | — | 24.1% |
+| Unconstrained MVO | 0.5592 | — | — | — | — |
+| 1/N (~867 stocks) | 0.5237 | — | — | — | — |
+
+GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05). Evaluation period: January 2005 – December 2025, 252 monthly rebalancing periods, transaction cost γ = 0.3%.
 
 ---
 
 ## Overview
 
-Mean-variance optimization is highly sensitive to estimation error, especially when the number of assets is large relative to the estimation window. This project studies whether a constraint-aware evolutionary algorithm can produce more robust out-of-sample portfolios by explicitly controlling portfolio size, asset weights, turnover, and concentration.
+Mean-variance optimization breaks down when the estimation window is short relative to the number of assets — a T=60 month window covering N≈867 stocks produces a near-singular covariance matrix. This project asks whether a constraint-aware evolutionary algorithm can produce more robust out-of-sample portfolios by directly controlling portfolio size, weight concentration, and turnover.
 
-The GA optimizes a long-only portfolio under realistic investment constraints:
-
-- cardinality constraint: `10 <= K <= 30`
-- per-asset weight bounds: `0.02 <= w_i <= 0.15`
-- full investment: `sum(w) = 1`
-- no short selling
-- optional turnover penalty in the fitness function
-- monthly rolling-window rebalancing
-
-The final evaluation compares:
-
-1. Genetic Algorithm with adaptive cardinality
-2. Constrained Mean-Variance Optimization
-3. Long-only unconstrained Mean-Variance Optimization
-4. Equal-weight `1/N` benchmark
+The GA selects K ∈ [10, 30] stocks per period, optimises a Sharpe-minus-turnover fitness function using Optuna-tuned operators, and is evaluated on 20 years of rolling out-of-sample returns. Against MVO and 1/N benchmarks on the same universe and cost model, the GA achieves a net Sharpe of 0.8751 — outperforming the next-best benchmark by 0.28 Sharpe points, with statistical significance at the 5% level.
 
 ---
 
-## Research Design
+## Results — Figures
 
-### Data
+![Cumulative net portfolio value](results/figures/F1_cumulative_returns.png)
+*Cumulative net portfolio value (2005–2025). GA reaches ~24× vs ~6× for benchmarks.*
 
-The project uses monthly US equity data from CRSP and a monthly risk-free rate series.
+![Rolling 12-month Sharpe ratio](results/figures/F2_rolling_sharpe.png)
+*Rolling 12-month Sharpe ratio. GA consistently leads across market regimes including GFC and COVID.*
 
-Raw data is not included in the repository because CRSP data is proprietary. The expected local inputs are:
+<details>
+<summary>More figures</summary>
 
-```text
-data/raw/crsp_returns.csv
-data/raw/risk_free_rate.csv
-```
+![Monthly portfolio turnover](results/figures/F3_turnover.png)
+*Monthly portfolio turnover (6-month rolling avg). GA turnover (21.8%) is below Constrained MVO (24.1%) despite holding a much smaller portfolio.*
 
-The pipeline converts these into processed parquet files used by the optimization and evaluation modules:
+![HHI concentration](results/figures/F4_hhi.png)
+*HHI concentration over time. GA is more concentrated by construction (avg K=14 vs 867 for benchmarks) — HHI values are not directly comparable across strategies.*
 
-```text
-data/raw/crsp_returns.parquet
-data/processed/risk_free_rate.parquet
-data/processed/universe.parquet
-data/processed/returns.parquet
-```
+![Adaptive cardinality K](results/figures/F5_cardinality.png)
+*Adaptive cardinality K over time. GA collapses to K≈10 post-GFC, reflecting higher estimation uncertainty.*
 
-### Universe Construction
+![Mean-variance frontier](results/figures/F6_frontier.png)
+*Mean-variance frontier at 3 representative dates (in-sample μ/Σ). GA operates inside the unconstrained frontier by design.*
 
-The eligible universe is built dynamically at every monthly rebalance date. The filters include:
+![GA convergence](results/figures/A1_convergence_comparison.png)
+*GA convergence: Optuna-tuned vs default parameters. Tuned operators reach higher in-sample Sharpe in fewer generations (Appendix A1).*
 
-- NYSE and NASDAQ listings only
-- common stocks only
-- lagged market capitalization of at least USD 2 billion
-- at least 60 months of complete return history
-- dynamic inclusion and exclusion to reduce survivorship bias
-
-The first out-of-sample rebalance date is January 2005 after a 60-month estimation window.
-
-### Optimization Setup
-
-At each rebalance date `t`:
-
-1. Estimate expected returns and covariance using months `t-60` to `t-1`
-2. Optimize portfolio weights using each strategy
-3. Apply the selected portfolio to the next realized monthly return
-4. Record net out-of-sample excess return after transaction costs
-5. Drift portfolio weights before computing turnover at the next rebalance
-
-The evaluation period is January 2005 to December 2025.
-
----
-
-## Genetic Algorithm
-
-The chromosome is a real-valued weight vector of length `N`, where only `K` entries are non-zero.
-
-### Core Components
-
-- bounded-simplex repair operator for exact feasibility
-- tournament selection
-- two-child weight-biased crossover
-- Gaussian weight mutation
-- asset-swap mutation
-- local pairwise weight-shift refinement
-- elitism
-- early stopping
-- Optuna hyperparameter tuning
-
-### Fitness Function
-
-The GA maximizes penalized in-sample Sharpe ratio:
-
-```text
-fitness(w) = Sharpe(w) - lambda * turnover(w, previous_weights)
-```
-
-where turnover is measured against the drifted pre-rebalance portfolio when available.
+</details>
 
 ---
 
 ## Repository Structure
 
-```text
-.
+```
+ga-portfolio-optimization/
+├── data/
+│   ├── raw/                  # CRSP CSV + FRED risk-free rate (not tracked)
+│   └── processed/            # Parquet files produced by pipeline (not tracked)
 ├── src/
 │   ├── data/
-│   │   ├── loader.py              # Load and validate raw CRSP data
-│   │   ├── universe.py            # Build dynamic eligible universe
-│   │   ├── risk_free_rate.py      # Process risk-free rate data
-│   │   └── returns.py             # Compute excess returns
-│   │
-│   ├── optimization/
-│   │   ├── genetic_algorithm.py   # Core GA operators and main loop
-│   │   ├── optuna_tuner.py        # Hyperparameter tuning
-│   │   └── runner.py              # Out-of-sample GA experiment runner
-│   │
+│   │   ├── loader.py         # CRSP CSV → parquet
+│   │   ├── universe.py       # Eligible universe construction per rebalancing date
+│   │   ├── returns.py        # Excess return computation (ret − rf)
+│   │   └── risk_free_rate.py # FRED DTB3 processing
 │   ├── benchmarks/
-│   │   ├── equal_weight.py        # 1/N benchmark
-│   │   └── mvo.py                 # MVO benchmarks
-│   │
+│   │   ├── mvo.py            # Unconstrained and constrained MVO (SLSQP)
+│   │   └── equal_weight.py   # 1/N naive benchmark
+│   ├── optimization/
+│   │   ├── genetic_algorithm.py  # GA operators, fitness function, main loop
+│   │   ├── runner.py             # Rolling OOS experiment with checkpointing
+│   │   └── optuna_tuner.py       # Hyperparameter search (TPE, 100 trials)
 │   ├── evaluation/
-│   │   ├── metrics.py             # Portfolio performance metrics
-│   │   ├── tables.py              # Thesis result tables
-│   │   ├── figures.py             # Main thesis figures
-│   │   ├── significance.py        # Statistical significance tests
-│   │   ├── convergence.py         # GA convergence diagnostics
-│   │   └── frontier.py            # Efficient frontier visualization
-│   │
+│   │   ├── metrics.py        # Sharpe, Sortino, drawdown, turnover, HHI
+│   │   ├── figures.py        # F1–F5 publication figures
+│   │   ├── significance.py   # Paired t-test + Jobson-Korkie significance tests
+│   │   ├── tables.py         # Table 1 (performance) and Table 3 (characteristics)
+│   │   ├── convergence.py    # Appendix A1 convergence plot
+│   │   └── frontier.py       # Figure 6 efficient frontier
 │   └── utils/
-│       ├── data.py                # Shared data loading helpers
-│       └── portfolio.py           # Rolling-window and turnover utilities
-│
+│       ├── portfolio.py      # Shared portfolio utilities (drift, alignment, estimation window)
+│       └── data.py           # Data loading entry point
 ├── tests/
-│   ├── test_genetic_algorithm.py
-│   └── test_metrics.py
-│
-├── requirements.txt
-├── LICENSE
-└── README.md
+│   └── test_metrics.py       # 38 unit tests for evaluation metrics
+├── results/
+│   ├── figures/              # PNG outputs (not tracked)
+│   ├── tables/               # CSV + LaTeX outputs (not tracked)
+│   └── ga/                   # GA parquet results + checkpoints (not tracked)
+└── requirements.txt
 ```
+
+---
+
+## Methodology
+
+**Data**
+- CRSP monthly stock file (CIZ format), Jan 2000 – Dec 2025, sourced from WRDS
+- NYSE and NASDAQ common stocks, market cap ≥ $2B (lagged 1 month)
+- ~867 eligible stocks per month (range: 487–1,105)
+- Risk-free rate: FRED DTB3 (3-month T-bill, annual % → monthly decimal)
+
+**Universe construction**
+- 60-month burn-in → first rebalancing date: January 2005
+- Stock eligible iff: exactly 60 non-missing returns in the estimation window and market cap ≥ $2B at t−1
+- Covariance regularized as Σ + 1e-4·I (T=60 << N≈867 makes sample Σ near-singular)
+
+**Genetic Algorithm**
+- Chromosome: real-valued weight vector with K ∈ [10, 30] non-zero entries, w_i ∈ [0.02, 0.15], Σw = 1
+- Fitness: monthly Sharpe − λ·Turnover (λ = 1.8437 from Optuna)
+- Operators: tournament selection (k=3), blend crossover (pc=0.6054), Gaussian weight mutation + asset-swap (pm=0.137, σ_m=0.1469)
+- Population: 100 | Generations: 200 | Early stop: 20 stagnant generations
+- Local refinement: greedy pairwise weight-shift hill-climber on best elite each generation
+- 30 independent runs per period; canonical portfolio selected at median in-sample fitness
+
+**MVO benchmarks**
+- Unconstrained: maximize Sharpe, long-only bounds [0, 1], SLSQP
+- Constrained: maximize Sharpe, long-only, max weight 0.15, SLSQP
+- Same estimation window, universe, and cost model as GA
+
+**Evaluation protocol**
+- 252 monthly OOS periods, January 2005 – December 2025
+- Transaction cost: γ = 0.3% per unit turnover (applied to all strategies)
+- Turnover computed against post-drift pre-rebalance weights
+- Checkpointing after every period; cloud runs on Google Cloud c2-standard-8
+
+**Statistical tests**
+- Paired t-test: H₀: mean return difference = 0
+- Jobson-Korkie test (Memmel 2003 correction): H₀: Sharpe difference = 0
+- α = 0.05, two-tailed
 
 ---
 
 ## Installation
 
-Clone the repository:
-
 ```bash
 git clone https://github.com/georgeded/ga-portfolio-optimization.git
 cd ga-portfolio-optimization
-```
-
-Create and activate a virtual environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
 ```
 
+> **Data access:** Raw CRSP data requires a WRDS subscription. Download the monthly stock file (CIZ format, 2000–2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
+
 ---
 
-## Usage
+## Reproduction
 
-### 1. Prepare Data
+Run each step in order. All commands are run from the repository root.
 
-Load and validate raw CRSP data:
+**1. Data pipeline**
 
 ```bash
+# Parse and validate raw CRSP data
 python3 -m src.data.loader
-```
 
-Process the risk-free rate:
+# Build eligible universe (487–1,105 stocks/month)
+python3 -m src.data.universe
 
-```bash
+# Compute excess returns
+python3 -m src.data.returns
+
+# Process risk-free rate
 python3 -m src.data.risk_free_rate
 ```
 
-Build the eligible universe:
-
-```bash
-python3 -m src.data.universe
-```
-
-Compute monthly excess returns:
-
-```bash
-python3 -m src.data.returns
-```
-
-### 2. Run Benchmarks
-
-Equal-weight benchmark:
-
-```bash
-python3 -m src.benchmarks.equal_weight
-```
-
-Mean-variance benchmarks:
-
-```bash
-python3 -m src.benchmarks.mvo
-```
-
-### 3. Tune GA Hyperparameters
-
-Debug run:
-
-```bash
-python3 -m src.optimization.optuna_tuner --debug
-```
-
-Full tuning run:
+**2. Hyperparameter tuning** *(optional — pre-tuned values already in `genetic_algorithm.py`)*
 
 ```bash
 python3 -m src.optimization.optuna_tuner
 ```
 
-### 4. Run GA Experiment
-
-Debug run:
+**3. Benchmarks**
 
 ```bash
-python3 -m src.optimization.runner --debug
+python3 -m src.benchmarks.mvo
+python3 -m src.benchmarks.equal_weight
 ```
 
-Full run:
+**4. GA out-of-sample experiment**
 
 ```bash
+# Full run (30 parallel runs × 200 generations × 252 periods — compute-intensive)
+python3 -m src.optimization.runner
+
+# Debug mode (3 runs, 50 generations, 10 periods)
+python3 -m src.optimization.runner --debug
+
+# Resume from checkpoint
 python3 -m src.optimization.runner
 ```
 
-The GA runner supports checkpointing and can resume interrupted cloud jobs.
-
-### 5. Generate Tables and Figures
+**5. Evaluation**
 
 ```bash
-python3 -m src.evaluation.tables
+# Figures F1–F5
 python3 -m src.evaluation.figures
-python3 -m src.evaluation.significance
-python3 -m src.evaluation.convergence
+
+# Efficient frontier (Figure 6)
 python3 -m src.evaluation.frontier
+
+# Convergence plot (Appendix A1)
+python3 -m src.evaluation.convergence
+
+# Performance and characteristics tables
+python3 -m src.evaluation.tables
+
+# Statistical significance tests (Table 2)
+python3 -m src.evaluation.significance
 ```
 
-Outputs are written to:
-
-```text
-results/benchmarks/
-results/ga/
-results/tables/
-results/figures/
-results/optuna/
-```
-
-These folders are ignored by Git by default because they may contain large generated files.
-
 ---
 
-## Testing
+## License
 
-Run the test suite with:
-
-```bash
-python3 -m pytest tests/ -v
-```
-
-The tests cover:
-
-- bounded-simplex projection
-- repair feasibility and idempotence
-- population initialization
-- tournament selection
-- crossover and mutation operators
-- local refinement
-- full GA execution
-- portfolio metric functions
-
----
-
-## Evaluation Metrics
-
-The project reports standard out-of-sample portfolio metrics:
-
-- annualized net return
-- annualized volatility
-- Sharpe ratio
-- Sortino ratio
-- maximum drawdown
-- monthly turnover
-- transaction cost
-- Herfindahl-Hirschman Index
-- portfolio size / cardinality
-
-Statistical significance is assessed using paired return tests and Sharpe-ratio comparison tests.
-
----
-
-## Methodological Notes
-
-- All reported performance is out-of-sample.
-- Portfolio optimization uses only information available at the rebalance date.
-- The risk-free rate is used for excess-return and Sharpe calculations, not as an investable GA asset.
-- Covariance matrices are diagonally regularized for numerical stability in high-dimensional estimation windows.
-- CRSP data and generated result files are excluded from version control.
-
----
-
-## Tech Stack
-
-- Python
-- NumPy
-- pandas
-- SciPy
-- Optuna
-- Matplotlib
-- pytest
-
----
-
-## Disclaimer
-
-This repository is for academic research purposes only. It is not financial advice and should not be used as a live trading or investment system.
-
----
-
-## Author
-
-**Georgios Dedempilis**  
-BSc Computer Science, Vrije Universiteit Amsterdam  
+MIT © [Georgios Dedempilis](https://github.com/georgeded)

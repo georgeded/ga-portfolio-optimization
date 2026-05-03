@@ -1,22 +1,7 @@
 """
-Statistical Significance Testing
-Compares GA performance against MVO and 1/N benchmarks using:
-
-1. Paired t-test on monthly net excess returns
-   - H0: mean(GA returns) - mean(benchmark returns) = 0
-
-2. Jobson-Korkie test with Memmel (2003) correction
-   - H0: Sharpe(GA) - Sharpe(benchmark) = 0
-   - Status quo method in portfolio comparison literature
-   - Used by DeMiguel et al. (2009)
-
-References:
-- Jobson & Korkie (1981): Performance hypothesis testing with the
-  Sharpe and Treynor measures. Journal of Finance, 36(4):889-908.
-- Memmel (2003): Performance hypothesis testing with the Sharpe ratio.
-  Finance Letters, 1:21-23.
-- DeMiguel et al. (2009): Optimal versus naive diversification.
-  Review of Financial Studies, 22(5):1915-1953.
+Significance tests comparing GA vs benchmarks:
+  1. Paired t-test: H0: mean return difference = 0
+  2. Jobson-Korkie (Memmel correction): H0: Sharpe difference = 0
 """
 
 import numpy as np
@@ -27,7 +12,6 @@ import os
 
 OUT_DIR = "results/tables"
 
-# ── Column name constants ─────────────────────────────────────────────────────
 COL_COMPARISON  = "Comparison"
 COL_MEAN_DIFF   = "Mean Diff (ann.)"
 COL_T_STAT      = "t-stat"
@@ -41,18 +25,10 @@ COL_JK_PVAL     = "JK p-value"
 COL_JK_SIG      = "JK Sig."
 
 
-# ── Jobson-Korkie Test (Memmel 2003 correction) ───────────────────────────────
-
 def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     """
-    Jobson-Korkie (1981) test for equality of two Sharpe ratios,
-    with Memmel (2003) correction.
-
-    Variance formula (Memmel 2003 corrected):
-        var = (1/T) * [2*(1-rho) + 0.5*SR1^2 + 0.5*SR2^2 - SR1*SR2*(1+rho)]
-
-    Note: var_diff can be negative when strategies are highly correlated.
-    The guard (var_diff <= 0 → z=0, p=1) is mathematically necessary.
+    Var(SR1 − SR2) = (1/T)·[2(1−ρ) + 0.5·SR1² + 0.5·SR2² − SR1·SR2·(1+ρ)]
+    var_diff can be negative for highly correlated strategies; guard → z=0, p=1.
     """
     T = len(r1)
     assert len(r2) == T, "Return series must have equal length"
@@ -96,8 +72,6 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     }
 
 
-# ── Paired t-test ─────────────────────────────────────────────────────────────
-
 def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
     """Paired t-test on monthly net excess return differences."""
     diff            = r1 - r2
@@ -110,18 +84,13 @@ def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
     }
 
 
-# ── Build Table 2 ─────────────────────────────────────────────────────────────
-
 def build_table2(
     ga_path      : str = "results/ga/ga_results.parquet",
     ew_path      : str = "results/benchmarks/equal_weight_full.parquet",
     mvo_unc_path : str = "results/benchmarks/mvo_unconstrained.parquet",
     mvo_con_path : str = "results/benchmarks/mvo_constrained.parquet",
 ) -> tuple:
-    """
-    Run all significance tests and return raw + formatted DataFrames.
-    Returns: (raw_df, fmt_df)
-    """
+    """Run all significance tests. Returns (raw_df, fmt_df)."""
     ga      = pd.read_parquet(ga_path)
     ew      = pd.read_parquet(ew_path)
     mvo_unc = pd.read_parquet(mvo_unc_path)
@@ -163,7 +132,6 @@ def build_table2(
 
     raw = pd.DataFrame(rows).set_index(COL_COMPARISON)
 
-    # Formatted version
     fmt = raw.copy()
     fmt[COL_MEAN_DIFF] = (raw[COL_MEAN_DIFF] * 100).map("{:.2f}%".format)
     fmt[COL_T_STAT]    = raw[COL_T_STAT].map("{:.3f}".format)
@@ -178,8 +146,6 @@ def build_table2(
 
     return raw, fmt
 
-
-# ── Print ─────────────────────────────────────────────────────────────────────
 
 def print_table2(fmt: pd.DataFrame) -> None:
     print("\n" + "="*80)
@@ -198,10 +164,7 @@ def print_table2(fmt: pd.DataFrame) -> None:
     print("="*80)
 
 
-# ── PNG ───────────────────────────────────────────────────────────────────────
-
 def to_png(fmt: pd.DataFrame, path: str) -> None:
-    """Save Table 2 as a PNG image."""
     display = fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG,
                    COL_SR_GA, COL_SR_BENCH, COL_SR_DIFF,
                    COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]].copy()
@@ -238,10 +201,7 @@ def to_png(fmt: pd.DataFrame, path: str) -> None:
     print(f"Saved: {path}")
 
 
-# ── LaTeX ─────────────────────────────────────────────────────────────────────
-
 def to_latex(fmt: pd.DataFrame) -> str:
-    """Generate LaTeX table for thesis inclusion."""
     display = fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG,
                    COL_SR_DIFF, COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]]
     return display.to_latex(
@@ -259,8 +219,6 @@ def to_latex(fmt: pd.DataFrame) -> str:
         bold_rows=False,
     )
 
-
-# ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)

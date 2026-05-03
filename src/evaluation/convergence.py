@@ -1,32 +1,11 @@
 """
-Appendix Figure A1 — GA Convergence Plot (Tuned vs Default Parameters)
+Figure A1 — GA Convergence (Tuned vs Default Parameters)
 
-Runs the GA with return_history=True at 3 representative rebalancing dates:
-- Pre-crisis : 2007-01-01
-- Post-crisis: 2010-01-01
-- Recent     : 2020-01-01
+Three dates: Jan 2007 (pre-crisis), Jan 2010 (post-crisis), Jan 2020 (recent).
+N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, λ inactive).
+λ excluded from this diagnostic — comparison isolates pc/pm/sigma_m only.
 
-Two parameter configurations are compared:
-1. Tuned: Optuna-optimised parameters (best_params.json)
-2. Default: standard EA defaults (pc=0.8, pm=0.1, sigma_m=0.05, lambda=0.0)
-
-IMPORTANT — fitness interpretation:
-    All runs use prev_weights=None. Since turnover is only computed when
-    prev_weights is not None, the turnover penalty λ·turnover = 0 for all
-    runs regardless of λ. Fitness therefore equals pure in-sample Sharpe
-    in all configurations. The comparison isolates the effect of crossover
-    rate (pc), mutation rate (pm), and mutation step size (sigma_m) only.
-    λ is intentionally excluded from this diagnostic.
-
-Outputs:
-- A1_convergence_tuned.png       — tuned parameters only
-- A1_convergence_default.png     — default parameters only
-- A1_convergence_comparison.png  — both overlaid per date (primary figure)
-
-Purpose:
-- Confirms 200 generations is sufficient for convergence
-- Shows that Optuna-tuned operator parameters (pc, pm, sigma_m) achieve
-  higher in-sample Sharpe than default parameters (supports RQ3 / H3)
+Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png
 """
 
 import numpy as np
@@ -39,7 +18,6 @@ from src.utils.portfolio import get_estimation_window
 from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga, N_GENS
 
-# ── Config ────────────────────────────────────────────────────────────────────
 REPR_DATES  = ["2007-01-01", "2010-01-01", "2020-01-01"]
 DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
@@ -94,30 +72,20 @@ plt.rcParams.update({
 })
 
 
-# ── Core: run GA with overridden params ───────────────────────────────────────
-
 def run_convergence_for_config(mu:       np.ndarray,
                                sigma:    np.ndarray,
                                n_assets: int,
                                params:   dict) -> tuple:
     """
-    Run N_RUNS_CONV GA instances with the given parameter config.
-    Temporarily overrides module-level constants in genetic_algorithm.py.
-    Restores originals after run — no side effects on other modules.
-
-    prev_weights=None throughout: turnover penalty is inactive,
-    fitness = pure in-sample Sharpe for all runs.
-
-    Returns:
-        (median_traj, q25, q75, generations, median_stop)
+    Temporarily overrides ga_module constants; restores after run regardless of exceptions.
+    prev_weights=None: λ inactive, fitness = pure in-sample Sharpe.
+    Returns (median_traj, q25, q75, generations, median_stop).
     """
-    # Save originals
     orig_pc      = ga_module.PC
     orig_pm      = ga_module.PM
     orig_sigma_m = ga_module.SIGMA_M
     orig_lambda  = ga_module.LAMBDA
 
-    # Override
     ga_module.PC      = params["pc"]
     ga_module.PM      = params["pm"]
     ga_module.SIGMA_M = params["sigma_m"]
@@ -138,7 +106,6 @@ def run_convergence_for_config(mu:       np.ndarray,
             all_histories.append(history)
 
     finally:
-        # Always restore originals — even if run crashes
         ga_module.PC      = orig_pc
         ga_module.PM      = orig_pm
         ga_module.SIGMA_M = orig_sigma_m
@@ -160,12 +127,9 @@ def run_convergence_for_config(mu:       np.ndarray,
     return median_traj, q25, q75, generations, median_stop
 
 
-# ── Plotting helpers ──────────────────────────────────────────────────────────
-
 def plot_single_config(results:    dict,
                        config_lbl: str,
                        filename:   str) -> None:
-    """Plot convergence for one parameter config across all 3 dates."""
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):
@@ -234,8 +198,6 @@ def plot_comparison(results: dict) -> None:
     plt.close(fig)
     print(f"Saved: {out_path}")
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def run_convergence() -> None:
     print("Loading data...")

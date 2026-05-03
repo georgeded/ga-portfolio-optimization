@@ -1,18 +1,4 @@
-"""
-Benchmark: Equal-Weight Portfolio (1/N)
-
-Constructs a naive equal-weight portfolio that assigns weight 1/N
-to every stock in the eligible universe at each rebalancing date t.
-
-Key properties:
-- No estimation required
-- Rebalanced monthly back to equal weights
-- Full eligible universe (~867 stocks) — consistent with DeMiguel et al. (2009)
-- Transaction costs applied via turnover calculation
-- Weights drift between rebalancing dates
-
-Reference: DeMiguel et al. (2009) "Optimal Versus Naive Diversification"
-"""
+"""Naive equal-weight (1/N) benchmark. Rebalanced monthly; weights drift between periods."""
 
 import numpy as np
 import pandas as pd
@@ -36,24 +22,6 @@ from src.utils.portfolio import (
 def run_equal_weight(universe: pd.DataFrame,
                      returns:  pd.DataFrame,
                      gamma:    float = TRANSACTION_COST) -> pd.DataFrame:
-    """
-    Run the equal-weight strategy over all rebalancing dates.
-
-    At each rebalancing date t:
-    1. Get eligible stocks from universe
-    2. Assign equal weights (1/N)
-    3. Apply weights to month t returns
-    4. Compute turnover vs drifted weights from last period
-    5. Record results
-
-    Args:
-        universe: DataFrame with columns [date, permno]
-        returns:  DataFrame with columns [date, permno, ret, rf, excess_ret]
-        gamma:    proportional transaction cost rate
-
-    Returns:
-        DataFrame with monthly results
-    """
     rebalance_dates  = sorted(universe["date"].unique())
     all_return_dates = sorted(returns["date"].unique())
 
@@ -63,7 +31,6 @@ def run_equal_weight(universe: pd.DataFrame,
 
     for t in rebalance_dates:
 
-        # Find end-of-month date for this rebalancing month
         apply_dates = [
             d for d in all_return_dates
             if d.year == t.year and d.month == t.month
@@ -72,16 +39,13 @@ def run_equal_weight(universe: pd.DataFrame,
             continue
         apply_date = apply_dates[0]
 
-        # Step 1: Get eligible stocks
         eligible = universe[universe["date"] == t]["permno"].tolist()
         N = len(eligible)
         if N == 0:
             continue
 
-        # Step 2: Equal weights
         weights = np.ones(N) / N
 
-        # Step 3: Get returns for month t
         month_ret     = get_monthly_returns(returns, eligible, apply_date)
         stock_returns = month_ret.values
 
@@ -89,7 +53,6 @@ def run_equal_weight(universe: pd.DataFrame,
         rf               = get_rf_for_month(returns, apply_date)
         portfolio_excess = portfolio_gross - rf
 
-        # Step 4: Compute turnover
         if prev_weights is not None and prev_permnos is not None:
             prev_ret      = get_monthly_returns(returns, prev_permnos, apply_date)
             drifted       = compute_drift_weights(prev_weights, prev_ret.values)
@@ -98,7 +61,6 @@ def run_equal_weight(universe: pd.DataFrame,
         else:
             turnover = 1.0
 
-        # Step 5: Transaction cost and net return
         cost       = gamma * turnover
         net_excess = portfolio_excess - cost
 

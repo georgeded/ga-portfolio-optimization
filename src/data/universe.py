@@ -1,22 +1,17 @@
 """
-Step 15: Universe Construction & Validation
-Filters raw CRSP data to construct the eligible investment universe
-at each rebalancing date t, following Step 5 of the methodology.
+Universe construction: eligible stocks at each rebalancing date.
 
-Filters applied:
+Filters:
 - NYSE and NASDAQ only (primaryexch IN ('N', 'Q'))
 - Common stocks only (ShareType/SecuritySubType/IssuerType combination)
-- Market cap >= $2 billion (|PRC| x SHROUT, lagged by 1 month)
-- Minimum 60 months of history prior to t
-- No missing returns within the 60-month estimation window
-- Assets included up to delisting date (MthRet includes delisting return)
+- Market cap ≥ $2B (|PRC| × SHROUT, lagged 1 month)
+- Exactly 60 non-missing returns in the 60-month estimation window
 """
 
 import pandas as pd
 import numpy as np
 import os
 
-# ── Constants (from Step 5 & Step 6) ────────────────────────────────────────
 MIN_MARKET_CAP_B  = 2.0    # billion USD
 ESTIMATION_WINDOW = 60     # months
 SHROUT_SCALE      = 1_000  # CRSP ShrOut is in thousands of shares
@@ -33,9 +28,8 @@ def load_raw_crsp(path: str = "data/raw/crsp_returns.parquet") -> pd.DataFrame:
 
 def compute_market_cap(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute market cap as |prc| x shrout (in billions).
-    shrout is in thousands of shares, prc is price per share.
-    Lags market cap by 1 month — at time t, uses t-1 value as per Step 5.
+    mktcap = |prc| × shrout (in billions); shrout in thousands.
+    Lagged 1 month — at time t, uses t-1 market cap.
     """
     df = df.copy()
     df["mktcap"] = df["prc"].abs() * df["shrout"] * SHROUT_SCALE / 1e9
@@ -46,15 +40,10 @@ def compute_market_cap(df: pd.DataFrame) -> pd.DataFrame:
 
 def filter_basic(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Apply static filters to remove ineligible securities.
-
     CIZ format equivalents of legacy SIZ filters:
-    - exchcd IN ('N','Q')           = NYSE and NASDAQ only
-    - sharetype = 'NS'              )
-    - securitytype = 'EQTY'         ) = common stocks only
-    - securitysubtype = 'COM'       ) (equivalent to legacy shrcd IN (10,11))
-    - usincflg = 'Y'                )
-    - issuertype IN ('CORP','ACOR') )
+    - exchcd IN ('N','Q')  = NYSE and NASDAQ only
+    - sharetype='NS', securitytype='EQTY', securitysubtype='COM',
+      usincflg='Y', issuertype IN ('CORP','ACOR')  = common stocks only (cf. shrcd IN (10,11))
     """
     before = len(df)
     df = df[df["exchcd"].isin(['N', 'Q'])]
@@ -78,28 +67,21 @@ def filter_basic(df: pd.DataFrame) -> pd.DataFrame:
 def build_monthly_universe(df: pd.DataFrame,
                            rebalance_date: pd.Timestamp) -> pd.Index:
     """
-    Build the eligible universe at a single rebalancing date t.
-
-    Rules applied:
-    1. Market cap >= $2B at t-1 (uses last available obs before t,
-       robust to stocks with missing observation exactly at window_end)
-    2. Exactly 60 non-missing returns in window [t-60, t-1]
-    3. Delisted assets auto-excluded (no return data after delisting)
-
-    Returns: pd.Index of eligible PERMNOs
+    1. Market cap ≥ $2B at t-1 (last available obs before t; robust to end-of-month gaps)
+    2. Exactly 60 non-missing returns in [t-60, t-1]
+    3. Delisted assets auto-excluded (no post-delisting return data)
+    Returns pd.Index of eligible PERMNOs.
     """
     # CRSP dates are end-of-month; subtract 1 day so end-of-month dates
     # fall inside the window (e.g. Dec 31 is included for Jan 1 rebalance)
     window_end   = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
 
-    # Subset to estimation window
     window_data = df[
         (df["date"] >= window_start) &
         (df["date"] <= window_end)
     ]
 
-    # Rule 1: Market cap filter using last available observation before t
     last_obs = (
         df[df["date"] <= window_end]
         .sort_values("date")
@@ -110,7 +92,6 @@ def build_monthly_universe(df: pd.DataFrame,
         last_obs["mktcap_lagged"] >= MIN_MARKET_CAP_B
     ]["permno"]
 
-    # Rules 2 & 3: Must have exactly 60 non-missing returns in window
     return_counts = (
         window_data[window_data["ret"].notna()]
         .groupby("permno")["ret"]
@@ -120,7 +101,6 @@ def build_monthly_universe(df: pd.DataFrame,
         return_counts == ESTIMATION_WINDOW
     ].index
 
-    # Must pass both filters
     eligible = eligible_mktcap[eligible_mktcap.isin(eligible_history)]
 
     return pd.Index(eligible)
@@ -130,13 +110,8 @@ def build_full_universe(df: pd.DataFrame,
                         start_date: str = "2005-01-01",
                         end_date:   str = "2025-12-01") -> dict:
     """
-    Build the eligible universe at every monthly rebalancing date.
-
-    Returns dict: {pd.Timestamp -> list of eligible PERMNOs}
-
-    First valid rebalancing date is 2005-01-01:
-    - Data starts 2000-01-01
-    - 60-month burn-in window = first usable date is 2005-01-01
+    Returns {pd.Timestamp -> list of PERMNOs} for each monthly date.
+    Data from 2000 + 60-month burn-in → first usable date is 2005-01-01.
     """
     df = compute_market_cap(df)
     df = filter_basic(df)
@@ -162,24 +137,16 @@ def build_full_universe(df: pd.DataFrame,
 
 
 def validate_universe(universe: dict) -> None:
-    """
-    Validation checks from Step 16 (Baseline Verification Design).
-
-    Universe size is descriptive only — 100-300 was the original estimate
-    from Step 5 based on literature. Actual size emerges from filters
-    applied to real data and is not constrained.
-    """
+    """Universe size of 100-300 was the original literature estimate; actual size is unconstrained."""
     sizes = pd.Series(
         {date: len(stocks) for date, stocks in universe.items()}
     )
 
-    # Check 1: No empty universe at any rebalancing date
     empty = sizes[sizes == 0]
     assert len(empty) == 0, f"Empty universe at: {empty.index.tolist()}"
     print("✓ No empty universes")
 
-    # Check 2: No sudden jumps (>50% change month-over-month)
-    # A sudden jump signals a data error, not a methodology issue
+    # sudden jump (>50% MoM) signals a data error, not methodology
     pct_change = sizes.pct_change().abs()
     large_jumps = pct_change[pct_change > 0.5]
     if len(large_jumps) > 0:
@@ -188,7 +155,6 @@ def validate_universe(universe: dict) -> None:
     else:
         print("✓ Universe size stable over time")
 
-    # Descriptive summary for thesis reporting
     print("\nUniverse size summary (descriptive):")
     print(f"  Mean   : {sizes.mean():.0f} stocks")
     print(f"  Median : {sizes.median():.0f} stocks")
@@ -203,7 +169,6 @@ if __name__ == "__main__":
     uni = build_full_universe(df)
     validate_universe(uni)
 
-    # Save as flat DataFrame for use by returns.py and all models
     os.makedirs("data/processed", exist_ok=True)
     rows = [
         {"date": date, "permno": permno}

@@ -1,16 +1,6 @@
 """
-Thesis Tables
-Generates Table 1 (Main Performance Comparison) and
-Table 3 (Portfolio Characteristics) as CSV, LaTeX and PNG.
-
-Table 1 columns (all net of transaction costs):
-- Annualized Return, Annualized Volatility, Sharpe Ratio,
-  Sortino Ratio, Max Drawdown, Avg Monthly Turnover, Avg Transaction Cost
-
-Table 3 columns (portfolio characteristics — answers RQ3):
-- Avg Portfolio Size (K), Avg HHI, Avg Monthly Turnover, Avg Transaction Cost
-
-Reference: DeMiguel et al. (2009) — evaluation protocol
+Generates Table 1 (performance comparison) and Table 3 (portfolio characteristics)
+as CSV, LaTeX, and PNG.
 """
 
 import numpy as np

@@ -10,18 +10,18 @@ Chromosome representation:
 import numpy as np
 from src.evaluation.metrics import portfolio_turnover
 
-# ── Fixed Design Decisions (not tuned by Optuna) ─────────────────────────────
-K_MIN      = 10      # minimum number of stocks to hold (Chang et al. 2000)
-K_MAX      = 30      # maximum number of stocks to hold (Chang et al. 2000)
-W_MIN      = 0.02    # minimum weight per selected stock (Step 7)
-W_MAX      = 0.15    # maximum weight per selected stock (Jagannathan & Ma 2003)
-POP_SIZE   = 100     # population size P (Eiben & Smith 2015)
-N_GENS     = 200     # maximum generations (computational budget)
-ELITE_FRAC = 0.05    # elitism fraction (Eiben & Smith 2015)
-LOCAL_ITER = 5       # local refinement iterations (computational budget)
-LOCAL_STEP = 0.01    # local refinement step size δ
-EARLY_STOP = 20      # stagnation patience in generations
-TOURNAMENT = 3       # tournament selection size k (Eiben & Smith 2015)
+# Not tuned by Optuna:
+K_MIN      = 10
+K_MAX      = 30
+W_MIN      = 0.02
+W_MAX      = 0.15
+POP_SIZE   = 100
+N_GENS     = 200
+ELITE_FRAC = 0.05    # top fraction preserved unchanged each generation
+LOCAL_ITER = 5       # hill-climber steps per elite refinement
+LOCAL_STEP = 0.01    # weight-shift step size δ
+EARLY_STOP = 20      # stagnation patience (generations)
+TOURNAMENT = 3       # tournament size
 
 PC      = 0.6054
 PM      = 0.1370
@@ -32,18 +32,8 @@ DEBUG = False
 
 def project_bounded_simplex(v, lower, upper, tol=1e-12):
     """
-    Exact projection onto the bounded simplex
-
-    sum(w)=1
-    lower <= w_i <= upper
-
-    Implemented via bisection on the Lagrange multiplier,
-    following bounded-simplex projection methods
-    (e.g. Duchi et al. 2008; Wang & Carreira-Perpinán 2013).
-
-    This replaces the iterative clip-normalize repair
-    described in the methodology, but enforces the same
-    constraints exactly and guarantees feasibility.
+    Exact projection onto {Σw=1, lower ≤ w_i ≤ upper} via bisection on the Lagrange multiplier.
+    Replaces iterative clip-normalize; enforces constraints in a single pass.
     """
 
     v = np.asarray(v, dtype=float)
@@ -56,7 +46,6 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
     def projected_sum(lam):
         return np.clip(v - lam, lower, upper).sum()
 
-    # bracket lambda
     lo = np.min(v) - upper
     hi = np.max(v) - lower
 
@@ -72,7 +61,6 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
 
     w = np.clip(v - lam, lower, upper)
 
-    # tiny cleanup
     w /= w.sum()
 
     return w
@@ -83,23 +71,8 @@ def repair(weights: np.ndarray,
            rng:     np.random.Generator,
            depth: int = 0) -> np.ndarray:
     """
-    Repair a weight vector to satisfy all constraints.
-
-    Constraints enforced in order:
-    1. Cardinality: K_MIN <= number of non-zero weights <= K_MAX
-    2. Weight clipping: W_MIN <= w_i <= W_MAX for selected stocks
-    3. Normalization: weights sum to 1.0
-    4. Re-check bounds after normalization (iterative until convergence)
-
-    The order matters — normalization after clipping may re-violate bounds,
-    so steps 2-3 repeat until stable (max 10 iterations).
-
-    Args:
-        weights: raw weight vector of length N (may violate constraints)
-        rng:     numpy Generator for random choices
-
-    Returns:
-        Feasible weight vector satisfying all constraints
+    Cardinality first (K_MIN ≤ K ≤ K_MAX), then bounded-simplex projection.
+    At most one recursive call for the rare case where projection drops a weight below W_MIN.
     """
 
     if depth > 1:
@@ -108,19 +81,16 @@ def repair(weights: np.ndarray,
     N = len(weights)
     w = weights.copy()
 
-    # ── Step 1: Cardinality repair ────────────────────────────────────────────
     selected   = np.nonzero(w > 0)[0]
     n_selected = len(selected)
 
     if n_selected > K_MAX:
-        # Keep only the K_MAX largest weights, zero out the rest
         keep = np.argpartition(w, -K_MAX)[-K_MAX:]
         mask = np.zeros(N, dtype=bool)
         mask[keep] = True
         w[~mask] = 0.0
 
     elif n_selected < K_MIN:
-        # Activate random zero-weight stocks until we reach K_MIN
         zeros      = np.nonzero(w == 0)[0]
         needed = K_MIN - n_selected
         if len(zeros) >= needed:
@@ -130,13 +100,11 @@ def repair(weights: np.ndarray,
             # Edge case: not enough stocks — activate all available zeros
             w[zeros] = W_MIN
 
-   # ── Steps 2–3: Bounded-simplex projection
-    # Replaces iterative clip → normalize → repeat repair
+   # Bounded-simplex projection — replaces iterative clip → normalize → repeat
     selected   = np.nonzero(w > 0)[0]
 
     w[selected] = project_bounded_simplex(w[selected], W_MIN, W_MAX)
 
-    # ── Step 4: Final cardinality check ──────────────────────────────────────
     selected   = np.nonzero(w > 0)[0]
     n_selected = len(selected)
 
@@ -175,45 +143,25 @@ def repair(weights: np.ndarray,
 def initialize_population(n_assets:   int,
                            rng: np.random.Generator) -> np.ndarray:
     """
-    Initialize a population of POP_SIZE feasible portfolios.
-
-    Each portfolio:
-    1. Randomly selects K stocks (K drawn uniformly from [K_MIN, K_MAX])
-    2. Assigns random weights from Dirichlet distribution
-    3. Repaired to satisfy all constraints
-
-    Args:
-        n_assets:   number of stocks in the universe at this rebalancing date
-        rng: numpy Generator for reproducibility
-    Note:
-    Parallel GA runs should use independent seeds
-    (e.g. base_seed + run_id) in runner.py.
-
-    Returns:
-        population array of shape (POP_SIZE, n_assets)
+    K ~ Uniform[K_MIN, K_MAX] stocks per individual; Dirichlet weights; repair applied.
+    Seeds must be independent across parallel runs (runner.py uses BASE_SEED + i).
     """
     population = np.zeros((POP_SIZE, n_assets))
 
     for i in range(POP_SIZE):
-        # Random cardinality K ∈ [K_MIN, K_MAX]
         K = rng.integers(K_MIN, K_MAX + 1)
 
-        # Random stock selection
         selected = rng.choice(n_assets, size=K, replace=False)
 
-        # Random weights from Dirichlet (uniform over simplex)
+        # Dirichlet gives uniform distribution over the weight simplex
         raw_weights = rng.dirichlet(np.ones(K))
 
-        # Place into full vector
         w          = np.zeros(n_assets)
         w[selected] = raw_weights
 
-        # Repair to enforce all constraints
         population[i] = repair(w, rng)
 
     return population
-
-# ── Fitness Function ──────────────────────────────────────────────────────────
 
 def fitness(weights:      np.ndarray,
             mu:           np.ndarray,
@@ -221,30 +169,9 @@ def fitness(weights:      np.ndarray,
             prev_weights: np.ndarray | None = None,
             lambda_:      float = LAMBDA) -> float:
     """
-    GA fitness function.
-
-    F(w) = Sharpe(w, mu, sigma) − λ × Turnover(w, prev_w)
-
-    Sharpe is computed from in-sample estimates (60-month rolling window),
-    not from realised returns. Monthly (non-annualised) Sharpe is used:
-    annualisation by √12 is a constant scaling that cancels in the ratio
-    and leaves the optimisation landscape unchanged.
-
-    Turnover penalty is 0.0 for the first rebalancing period (prev_weights
-    is None) — there is no prior portfolio to trade from. This is distinct
-    from the evaluation convention (turnover = 1.0 at t=0), which applies
-    only when computing reported transaction costs, not during optimisation.
-
-    Args:
-        weights:      feasible weight vector of length N (K non-zero entries)
-        mu:           in-sample mean excess return vector, length N
-        sigma:        in-sample covariance matrix, shape (N, N)
-        prev_weights: pre-rebalance weight vector aligned to current universe
-                      (after drift, length N); None for the first period
-        lambda_:      turnover penalty coefficient (Optuna-tuned, default 0.0)
-
-    Returns:
-        Scalar fitness value (higher is better)
+    F(w) = Sharpe(w) − λ·Turnover(w, prev_w), using monthly (non-annualised) Sharpe.
+    √12 cancels in the ratio so annualisation doesn't change the optimisation landscape.
+    At t=0 (prev_weights=None), penalty=0. Distinct from evaluation convention (turnover=1.0 at t=0).
     """
     port_return = float(weights @ mu)
     port_var    = float(weights @ sigma @ weights)
@@ -262,75 +189,37 @@ def fitness(weights:      np.ndarray,
     return sharpe - penalty
 
 
-# ── Tournament Selection ──────────────────────────────────────────────────────
-
 def tournament_select(population: np.ndarray,
                       fitnesses:  np.ndarray,
                       rng:        np.random.Generator,
                       k:          int = TOURNAMENT) -> np.ndarray:
     """
-    Tournament selection: sample k individuals without replacement,
-    return a copy of the one with the highest fitness.
-
-    Called twice per crossover event to produce two parents. Using
-    replace=False prevents the degenerate case where the same individual
-    fills all tournament slots, which would make selection pressure
-    dependent on population size in a non-meaningful way.
-
-    Args:
-        population: weight matrix of shape (POP_SIZE, N)
-        fitnesses:  pre-computed fitness array of shape (POP_SIZE,)
-        rng:        numpy Generator for reproducibility
-        k:          tournament size (default TOURNAMENT = 3)
-
-    Returns:
-        Copy of the winner's weight vector, shape (N,)
+    Sample k individuals (replace=False), return the best.
+    replace=False avoids the degenerate case where all slots are filled by the same individual.
     """
     k = min(k, len(population))
     indices = rng.choice(len(population), size=k, replace=False)
     winner  = indices[np.argmax(fitnesses[indices])]
     return population[winner].copy()
 
-# ── Crossover Operator ────────────────────────────────────────────────────────
-
 def _make_child(w1: np.ndarray,
                 w2: np.ndarray,
                 rng: np.random.Generator) -> np.ndarray:
     """
-    Produce one offspring from two parents.
-
-    Steps:
-    1. Compute union of active stocks from both parents.
-    2. Draw child cardinality K_child uniformly from [K_MIN, K_MAX].
-    3. Sample K_child stocks from union without replacement, weighted by
-       average parental weight (intersection stocks get 2× the sampling
-       probability of exclusive stocks, reflecting genetic consensus).
-    4. Blend weights using a single shared α ~ Uniform(0, 1).
-       For exclusive stocks, the absent parent contributes weight 0.
-    5. Repair to enforce all constraints.
-
-    Args:
-        w1: feasible weight vector for parent 1, length N
-        w2: feasible weight vector for parent 2, length N
-        rng: numpy Generator
-
-    Returns:
-        Feasible child weight vector, length N
+    Union of active stocks from both parents; child cardinality drawn independently.
+    Stocks sampled proportional to average parental weight (intersection gets 2× probability).
+    Weights blended with shared α ~ Uniform(0,1); repair enforces all constraints.
     """
     N     = len(w1)
     union = np.nonzero((w1 > 0) | (w2 > 0))[0]
     if len(union) == 0:
         return repair(np.ones(len(w1))/len(w1), rng)
 
-    # Draw child cardinality independently — crossover is primary source
-    # of cardinality exploration across [K_MIN, K_MAX]
+    # cardinality varies by crossover — primary source of K exploration across [K_MIN, K_MAX]
     k_child = rng.integers(K_MIN, K_MAX + 1)
-    k_child = min(k_child, len(union))  # cap at union size (never binding
-                                         # with K<=30 and N~867, but required
-                                         # for correctness)
+    k_child = min(k_child, len(union))  # never binding with K≤30, N~867, but required
 
-    # Weight-biased sampling: intersection stocks have 2× the probability
-    # of stocks held by only one parent
+    # intersection stocks weighted 2× relative to exclusive stocks
     probs = (w1[union] + w2[union]) / 2.0
     s = probs.sum()
     if s <= 1e-12:
@@ -345,8 +234,7 @@ def _make_child(w1: np.ndarray,
     w_child = np.zeros(N)
     w_child[selected] = alpha * w1[selected] + (1.0 - alpha) * w2[selected]
 
-    # Near-zero cleanup before repair: exclusive stocks scaled by small alpha
-    # can produce phantom weights that confuse cardinality counting in repair
+    # phantom tiny weights from small-α exclusive stocks confuse repair's cardinality count
     w_child[w_child < 1e-10] = 0.0
 
     return repair(w_child, rng)
@@ -357,20 +245,8 @@ def crossover(p1: np.ndarray,
               rng: np.random.Generator,
               pc: float = PC) -> tuple[np.ndarray, np.ndarray]:
     """
-    Two-child crossover with probability pc.
-
-    If crossover does not fire, copies of both parents are returned.
-    Two children are produced per crossover event by swapping the parent
-    roles, doubling information extracted from each tournament pair.
-
-    Args:
-        p1:  feasible weight vector for parent 1, length N
-        p2:  feasible weight vector for parent 2, length N
-        rng: numpy Generator
-        pc:  crossover probability (default PC = 0.8)
-
-    Returns:
-        Tuple of two feasible child weight vectors, each length N
+    Fires with probability pc; returns parent copies otherwise.
+    Two children per event (parent roles swapped) to extract more information per tournament pair.
     """
     if rng.random() > pc:
         return p1.copy(), p2.copy()
@@ -380,43 +256,14 @@ def crossover(p1: np.ndarray,
     return child1, child2
 
 
-# ── Mutation Operator ─────────────────────────────────────────────────────────
-
 def mutate(w: np.ndarray,
            rng: np.random.Generator,
            pm: float = PM) -> np.ndarray:
     """
-    Apply Gaussian weight mutation and/or asset-swap mutation.
-
-    Two independent Bernoulli draws, each with probability pm:
-
-    (a) Gaussian weight mutation: add N(0, SIGMA_M) noise to all currently
-        selected (non-zero) weights. Weights pushed negative are zeroed.
-        SIGMA_M = 0.02 ≈ 1/6 of the weight range [W_MIN, W_MAX], consistent
-        with standard bounded real-valued mutation calibration (Eiben & Smith
-        2015). Optuna searches [0.01, 0.15].
-
-    (b) Asset-swap mutation: remove one randomly chosen held stock (set to 0),
-        add one randomly chosen unheld stock at W_MIN. Preserves cardinality
-        exactly before repair. Skipped if no unheld stocks exist.
-
-    A single repair() is applied at the end if any operator fired.
-    Applying repair after each operator independently would dampen both
-    perturbations and produce less varied offspring.
-
-    pm is interpreted as per-chromosome probability, not per-gene:
-        P(no mutation)      = (1 - pm)^2
-        P(Gaussian only)    = pm(1 - pm)
-        P(swap only)        = pm(1 - pm)
-        P(both)             = pm^2
-
-    Args:
-        w:   feasible weight vector, length N
-        rng: numpy Generator
-        pm:  per-operator mutation probability (default PM = 0.1)
-
-    Returns:
-        Feasible weight vector (mutated or unchanged copy)
+    Two independent Bernoulli draws (each with probability pm):
+    (a) Gaussian: add N(0, SIGMA_M) noise to selected weights; negatives zeroed (treated as dropped).
+    (b) Swap: remove one held stock (→0), add one unheld stock at W_MIN; preserves cardinality pre-repair.
+    Single repair at end — not after each operator — to avoid dampening both perturbations.
     """
     w = w.copy()
     gaussian_fired = rng.random() < pm
@@ -425,15 +272,11 @@ def mutate(w: np.ndarray,
     if gaussian_fired:
         selected = w > 0
         w[selected] += rng.normal(0.0, SIGMA_M, size=selected.sum())
-        # Zero out negatives: these are stocks pushed below 0 by noise.
-        # Treated as dropped holdings; repair re-checks cardinality.
         w[w < 0.0] = 0.0
         w[w > 1.0] = 1.0
 
     if swap_fired:
-        # Operate on current w (may be dirty from Gaussian step).
-        # w > 0 and w == 0 are meaningful even on non-normalised vectors:
-        # Gaussian adds to existing non-zero weights, never activates true zeros.
+        # w > 0 / w == 0 remain meaningful on non-normalised vectors
         non_zero = np.nonzero(w > 0)[0]
         zero = np.nonzero(w == 0)[0]
         if len(non_zero) > 0 and len(zero) > 0:
@@ -441,8 +284,7 @@ def mutate(w: np.ndarray,
             w[rng.choice(zero)]     = W_MIN
 
     if gaussian_fired or swap_fired:
-        # Near-zero cleanup: Gaussian noise can leave phantom tiny positives
-        # that are not true holdings but confuse cardinality counting in repair.
+        # phantom tiny positives from Gaussian noise confuse repair
         w[w < 1e-10] = 0.0
         try:
             w = repair(w, rng)
@@ -451,32 +293,16 @@ def mutate(w: np.ndarray,
 
     return w
 
-# ── Local Refinement ──────────────────────────────────────────────────────────
- 
+
 def local_refine(w:            np.ndarray,
                  mu:           np.ndarray,
                  sigma:        np.ndarray,
                  prev_weights: np.ndarray | None,
                  rng:          np.random.Generator) -> tuple[np.ndarray, float]:
     """
-    Pairwise weight-shift hill-climber applied to a single feasible chromosome.
- 
-    At each iteration, randomly selects two held stocks (i, j) and shifts
-    LOCAL_STEP weight from i to j, subject to W_MIN/W_MAX bounds. The shift
-    is accepted only if fitness improves (greedy acceptance). Sum and
-    cardinality are preserved by construction — no repair is needed.
- 
-    Args:
-        w:            feasible weight vector, length N
-        mu:           in-sample mean excess return vector, length N
-        sigma:        in-sample covariance matrix, shape (N, N)
-        prev_weights: pre-rebalance weights aligned to current universe,
-                      or None for the first period
-        rng:          numpy Generator
- 
-    Returns:
-        Tuple of (refined feasible weight vector of length N, its fitness value).
-        Fitness is returned to avoid recomputation in the caller.
+    Greedy pairwise weight-shift (LOCAL_STEP from i → j) for LOCAL_ITER steps.
+    Accepted only on fitness improvement. Sum and cardinality preserved — no repair needed.
+    Returns (refined_w, fitness) to avoid recomputation in caller.
     """
     w_best = w.copy()
     f_best = fitness(w_best, mu, sigma, prev_weights, LAMBDA)
@@ -507,8 +333,7 @@ def local_refine(w:            np.ndarray,
     return w_best, f_best
  
  
-# ── Main GA Loop ──────────────────────────────────────────────────────────────
- 
+
 def run_ga(n_assets:     int,
            mu:           np.ndarray,
            sigma:        np.ndarray,
@@ -516,29 +341,10 @@ def run_ga(n_assets:     int,
            rng:          np.random.Generator,
            return_history: bool = False) -> np.ndarray:
     """
-    Full generational GA with elitism, local refinement, and early stopping.
- 
-    At each generation:
-      1. Elite chromosomes are preserved unchanged (except the single best,
-         which receives local refinement).
-      2. Offspring fill the remaining slots via tournament selection,
-         crossover, and mutation.
-      3. Fitness is carried over for elites and recomputed for offspring only.
-      4. Early stopping triggers after EARLY_STOP consecutive generations
-         with improvement < 1e-6.
- 
-    Args:
-        n_assets:     number of stocks in the current universe
-        mu:           in-sample mean excess return vector, length n_assets
-        sigma:        in-sample covariance matrix, shape (n_assets, n_assets)
-        prev_weights: pre-rebalance weights aligned to current universe,
-                      or None for the first rebalancing period
-        rng:          numpy Generator (seed set by runner per run)
- 
-    Returns:
-        Best feasible weight vector found across all generations, length n_assets
+    Generational GA: elites preserved (best one gets local refinement), rest via selection/crossover/mutation.
+    Fitness carried over for elites; recomputed for offspring only.
+    Early stop after EARLY_STOP consecutive generations with improvement < 1e-6.
     """
-    # ── Initialization ────────────────────────────────────────────────────────
     population = initialize_population(n_assets, rng)
     fitnesses  = np.array([
         fitness(population[i], mu, sigma, prev_weights, LAMBDA)
@@ -552,26 +358,22 @@ def run_ga(n_assets:     int,
     stagnation  = 0
     fitness_history = []
  
-    # ── Generation loop ───────────────────────────────────────────────────────
     for _ in range(N_GENS):
  
-        # Step 1: Extract elites (sorted ascending; last entry is best)
+        # sorted ascending — last entry is the best
         elite_idx = np.argsort(fitnesses)[-n_elite:]
         elites    = population[elite_idx].copy()
         elite_fit = fitnesses[elite_idx].copy()
  
-        # Step 2: Local refinement on the single best individual.
-        # local_refine returns (w, f) — fitness is reused directly,
-        # avoiding one redundant evaluation.
+        # local_refine returns (w, f) — fitness reused, avoiding one redundant evaluation
         elites[-1], elite_fit[-1] = local_refine(
             elites[-1], mu, sigma, prev_weights, rng
         )
  
-        # Step 3: Build next generation — elites occupy slots 0..n_elite-1
+        # elites occupy slots 0..n_elite-1
         new_pop = np.empty_like(population)
         new_pop[:n_elite] = elites
  
-        # Step 4: Fill remaining slots with offspring
         i = n_elite
         while i < POP_SIZE:
             p1     = tournament_select(population, fitnesses, rng)
@@ -587,7 +389,7 @@ def run_ga(n_assets:     int,
  
         population = new_pop
  
-        # Step 5: Update fitness — carry over elite, recompute offspring only
+        # carry over elite fitness; recompute offspring only
         new_fit = np.empty(POP_SIZE)
         new_fit[:n_elite] = elite_fit
         for i in range(n_elite, POP_SIZE):
@@ -596,7 +398,6 @@ def run_ga(n_assets:     int,
             )
         fitnesses = new_fit
  
-        # Step 6: Track best-ever and early stopping
         gen_best_idx = int(np.argmax(fitnesses))
         gen_best_f   = fitnesses[gen_best_idx]
  

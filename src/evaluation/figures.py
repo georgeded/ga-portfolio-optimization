@@ -1,19 +1,6 @@
 """
-Thesis Figures
-Generates all publication-quality figures for the thesis.
-
-Figures produced:
-- F1: Cumulative net returns (all 4 models)
-- F2: Rolling 12-month Sharpe ratio
-- F3: Monthly portfolio turnover
-- F4: Herfindahl-Hirschman Index (concentration)
-- F5: GA cardinality (K) over time
-
-All figures saved to results/figures/ as 300 DPI PNGs.
-Figures are greyscale-compatible (readable in black-and-white print).
-Legends are placed below the figure to avoid obscuring data.
-
-Reference: SRC-RPT — "Figures must be readable in a black-and-white print."
+Generates F1–F5: cumulative returns, rolling Sharpe, turnover, HHI, and GA cardinality.
+Greyscale-compatible (readable in B&W print). Legends below figure to avoid obscuring data.
 """
 
 import numpy as np
@@ -24,7 +11,6 @@ import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import os
 
-# ── Style ─────────────────────────────────────────────────────────────────────
 plt.rcParams.update({
     "figure.dpi"       : 300,
     "font.family"      : "serif",
@@ -75,8 +61,6 @@ def make_crisis_handles() -> list:
     ]
 
 
-# ── Data Loading ──────────────────────────────────────────────────────────────
-
 def load_all(
     ga_path      : str = "results/ga/ga_results.parquet",
     ew_path      : str = "results/benchmarks/equal_weight_full.parquet",
@@ -101,8 +85,6 @@ def load_all(
 
     return data
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def cumulative_returns(df: pd.DataFrame) -> np.ndarray:
     total = df["net_excess_ret"].values + df["rf"].values
@@ -153,7 +135,6 @@ def add_bottom_legend(fig, extra_handles: list = None,
 
 
 def add_caption(fig, text: str) -> None:
-    """Italic caption below the legend."""
     fig.text(
         0.5, -0.10, text,
         ha="center", va="top",
@@ -167,8 +148,6 @@ def fmt_axes(ax) -> None:
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax.xaxis.set_major_locator(mdates.YearLocator(2))
 
-
-# ── F1: Cumulative Returns ────────────────────────────────────────────────────
 
 def plot_cumulative_returns(data: dict) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -197,8 +176,6 @@ def plot_cumulative_returns(data: dict) -> None:
     plt.close(fig)
     print("Saved: F1_cumulative_returns.png")
 
-
-# ── F2: Rolling 12-Month Sharpe ───────────────────────────────────────────────
 
 def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -230,8 +207,6 @@ def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
     print("Saved: F2_rolling_sharpe.png")
 
 
-# ── F3: Monthly Turnover ──────────────────────────────────────────────────────
-
 def plot_turnover(data: dict) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -262,8 +237,6 @@ def plot_turnover(data: dict) -> None:
     print("Saved: F3_turnover.png")
 
 
-# ── F4: HHI Concentration ─────────────────────────────────────────────────────
-
 def plot_hhi(data: dict) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -293,8 +266,6 @@ def plot_hhi(data: dict) -> None:
     plt.close(fig)
     print("Saved: F4_hhi.png")
 
-
-# ── F5: GA Cardinality (K) Over Time ─────────────────────────────────────────
 
 def plot_cardinality(data: dict) -> None:
     df  = data["GA"]
@@ -350,8 +321,6 @@ def plot_cardinality(data: dict) -> None:
     plt.close(fig)
     print("Saved: F5_cardinality.png")
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     os.makedirs(OUT_DIR, exist_ok=True)

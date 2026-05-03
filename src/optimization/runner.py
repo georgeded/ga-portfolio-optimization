@@ -1,6 +1,4 @@
 """
-src/optimization/runner.py
-
 Out-of-sample GA experiment runner.
 
 For each of the 252 monthly rebalancing periods (Jan 2005 – Dec 2025):
@@ -57,7 +55,6 @@ from src.utils.portfolio import (
     print_results,
 )
 
-# ── Experiment constants ──────────────────────────────────────────────────────
 N_RUNS     = 30
 BASE_SEED  = 1000        # run i uses seed BASE_SEED + i
 OUTPUT_DIR = "results/ga"
@@ -67,15 +64,9 @@ WEIGHTS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_weights.npy")
 PERMNOS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_permnos.npy")
 
 
-# ── Worker function (module-level for multiprocessing pickling) ───────────────
-
+# module-level for multiprocessing pickling
 def _run_single(args: tuple) -> np.ndarray:
-    """
-    Run one GA instance. Returns the best weight vector.
-
-    Args:
-        args: (n_assets, mu, sigma, prev_weights, seed, n_gens)
-    """
+    """args: (n_assets, mu, sigma, prev_weights, seed, n_gens)"""
     n_assets, mu, sigma, prev_weights, seed, n_gens = args
 
     original_n_gens  = ga_module.N_GENS
@@ -89,8 +80,6 @@ def _run_single(args: tuple) -> np.ndarray:
     return w
 
 
-# ── Period processor ──────────────────────────────────────────────────────────
-
 def _process_period(
     t:            pd.Timestamp,
     apply_date:   pd.Timestamp,
@@ -103,27 +92,17 @@ def _process_period(
     pool:         Pool,
     gamma:        float,
 ) -> tuple[dict, np.ndarray, list]:
-    """
-    Process one rebalancing period.
-
-    Returns:
-        (result_row, new_drifted_weights, new_permnos)
-
-        new_drifted_weights is the drifted canonical weight vector aligned to
-        valid_permnos — ready to pass as prev_weights in the next period.
-    """
+    """Returns (result_row, new_drifted_weights, new_permnos); drifted weights aligned to valid_permnos."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
 
-    # ── Build estimation window ───────────────────────────────────────────────
     mu, sigma, valid_permnos = get_estimation_window(returns, eligible, t)
     if mu is None or len(valid_permnos) < 2:
         return None, prev_weights, prev_permnos
 
     n_assets = len(valid_permnos)
 
-    # ── Align prev_weights to current valid universe ──────────────────────────
     if prev_weights is not None and prev_permnos is not None:
         prev_ret_series = get_monthly_returns(returns, prev_permnos, apply_date)
         drifted         = compute_drift_weights(prev_weights, prev_ret_series.values)
@@ -131,31 +110,25 @@ def _process_period(
     else:
         pw_aligned = None
 
-    # ── Launch N_RUNS parallel GA instances ───────────────────────────────────
     worker_args = [
         (n_assets, mu, sigma, pw_aligned, BASE_SEED + i, n_gens)
         for i in range(n_runs)
     ]
     all_weights: list[np.ndarray] = pool.map(_run_single, worker_args)
 
-    # ── Apply each run's weights to realised returns ──────────────────────────
     month_ret  = get_monthly_returns(returns, valid_permnos, apply_date)
     stock_rets = month_ret.values
     rf         = get_rf_for_month(returns, apply_date)
 
     gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
 
-   # ── Median aggregation ────────────────────────────────────────────────────
-    # Reported return: median realised gross return across all runs.
     median_ret      = float(np.median(gross_returns))
     portfolio_gross  = median_ret
     portfolio_excess = portfolio_gross - rf
 
-    # Canonical portfolio: run at the median of the IN-SAMPLE fitness
-    # distribution, not the realised return distribution. This eliminates
-    # the ex-post dependency on realised returns for prev_weights selection.
-    # pw_aligned is passed so the fitness penalty (if LAMBDA > 0) is
-    # consistent with what run_ga optimised against.
+    # Canonical = run at median IN-SAMPLE fitness (not realised return) — avoids ex-post
+    # return dependency for prev_weights. pw_aligned ensures the penalty is consistent
+    # with what run_ga optimised against.
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, ga_module.LAMBDA)
         for w in all_weights
@@ -164,7 +137,6 @@ def _process_period(
     canonical_i    = int(np.argmin(np.abs(in_sample_fitnesses - median_fitness)))
     canon_w        = all_weights[canonical_i]
 
-    # ── Turnover ──────────────────────────────────────────────────────────────
     if pw_aligned is not None:
         turnover = portfolio_turnover(canon_w, pw_aligned)
     else:
@@ -191,14 +163,11 @@ def _process_period(
         "gross_ret_max"    : float(np.max(gross_returns)),
     }
 
-    # ── Drift canonical weights for next period ───────────────────────────────
     new_weights = compute_drift_weights(canon_w, stock_rets)
     new_permnos = valid_permnos
 
     return result, new_weights, new_permnos
 
-
-# ── Checkpoint helpers ────────────────────────────────────────────────────────
 
 def _save_checkpoint(completed_results: list[dict],
                      prev_weights:      np.ndarray,
@@ -236,26 +205,12 @@ def _clear_checkpoint() -> None:
     print("Checkpoint cleared.")
 
 
-# ── Main runner ───────────────────────────────────────────────────────────────
-
 def run(n_runs:           int         = N_RUNS,
         n_gens:           int         = ga_module.N_GENS,
         max_periods:      int | None  = None,
         gamma:            float       = TRANSACTION_COST,
         clear_checkpoint: bool        = False) -> pd.DataFrame:
-    """
-    Run the full GA out-of-sample experiment with checkpointing.
-
-    Args:
-        n_runs:           number of parallel GA runs per period
-        n_gens:           maximum generations per GA run
-        max_periods:      cap on number of periods (None = all 252)
-        gamma:            transaction cost rate
-        clear_checkpoint: if True, delete existing checkpoint before running
-
-    Returns:
-        DataFrame of monthly results (same schema as benchmark runners)
-    """
+    """Run the full OOS GA experiment with checkpointing. Returns monthly results DataFrame."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     if clear_checkpoint:
@@ -269,7 +224,6 @@ def run(n_runs:           int         = N_RUNS,
     if max_periods is not None:
         rebalance_dates = rebalance_dates[:max_periods]
 
-    # ── Resume from checkpoint if it exists ──────────────────────────────────
     completed_results: list[dict]   = []
     completed_dates:   set          = set()
     prev_weights: np.ndarray | None = None
@@ -288,7 +242,6 @@ def run(n_runs:           int         = N_RUNS,
     print(f"Periods to process : {len(remaining)}")
     print(f"Parallel runs      : {n_runs}  |  Max generations: {n_gens}")
 
-    # ── Process periods ───────────────────────────────────────────────────────
     n_workers = min(n_runs, mp.cpu_count())
     t0_total  = time.time()
 
@@ -316,7 +269,6 @@ def run(n_runs:           int         = N_RUNS,
 
             completed_results.append(result)
 
-            # Save results + weight state after every period
             _save_checkpoint(completed_results, prev_weights, prev_permnos)
 
             tqdm.write(
@@ -337,8 +289,6 @@ def run(n_runs:           int         = N_RUNS,
 
     return results_df
 
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GA portfolio runner")

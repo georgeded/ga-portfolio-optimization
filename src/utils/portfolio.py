@@ -8,7 +8,6 @@ ESTIMATION_WINDOW   = 60
 def get_monthly_returns(returns: pd.DataFrame,
                         permnos: list,
                         month:   pd.Timestamp) -> pd.Series:
-    """Get actual returns for a set of stocks in a given month."""
     mask = (
         (returns["date"] == month) &
         (returns["permno"].isin(permnos))
@@ -19,14 +18,12 @@ def get_monthly_returns(returns: pd.DataFrame,
 
 def get_rf_for_month(returns: pd.DataFrame,
                      month:   pd.Timestamp) -> float:
-    """Get the risk-free rate for a given month."""
     rf_vals = returns.loc[returns["date"] == month, "rf"].dropna()
     return float(rf_vals.iloc[0]) if len(rf_vals) > 0 else 0.0
 
 
 def compute_drift_weights(weights:       np.ndarray,
                           stock_returns: np.ndarray) -> np.ndarray:
-    """Compute drifted weights after one month of returns."""
     stock_returns = np.nan_to_num(stock_returns, nan=0.0)
     drifted       = weights * (1 + stock_returns)
     total         = drifted.sum()
@@ -41,7 +38,6 @@ def compute_drift_weights(weights:       np.ndarray,
 def cap_universe(universe: pd.DataFrame,
                  returns:  pd.DataFrame,
                  top_n:    int = 200) -> pd.DataFrame:
-    """At each rebalancing date, keep only the top N stocks by market cap."""
     returns           = returns.copy()
     returns["mktcap"] = returns["prc"].abs() * returns["shrout"] * 1000
 
@@ -64,13 +60,8 @@ def cap_universe(universe: pd.DataFrame,
 def align_drifted_weights(prev_weights: np.ndarray,
                           prev_permnos: list,
                           curr_permnos: list) -> np.ndarray:
-    """Align drifted weights from previous period to current universe.
-
-    Stocks leaving the portfolio get weight 0.
-    Stocks entering the portfolio get weight 0.
-    Result is normalized to sum to 1.
-    If all previous stocks left the universe, falls back to equal weight
-    (treated as full portfolio replacement).
+    """Reindex drifted weights to the current universe (new/departed stocks → 0).
+    Falls back to equal weight if all prior holdings have left the universe.
     """
     aligned = (pd.Series(prev_weights, index=prev_permnos)
                .reindex(curr_permnos, fill_value=0.0)
@@ -83,21 +74,14 @@ def align_drifted_weights(prev_weights: np.ndarray,
         aligned = np.ones(len(curr_permnos)) / len(curr_permnos)
     return aligned
 
-# ── Estimation ────────────────────────────────────────────────────────────────
 
 def get_estimation_window(returns:        pd.DataFrame,
                           permnos:        list,
                           rebalance_date: pd.Timestamp) -> tuple:
     """
-    Get expected returns and covariance matrix for the estimation window.
-
-    Uses excess returns from [t-60, t-1] months (60-month rolling window).
-    Drops stocks with any missing return in the window.
-
-    Returns:
-        mu:            expected excess returns vector (N,)
-        sigma:         covariance matrix (N, N)
-        valid_permnos: stocks with complete 60-month history
+    Build mu and sigma from the 60-month window [t-60, t-1].
+    Drops any stock with a missing observation — ensures full-rank input
+    before regularization (sigma + 1e-4 * I).
     """
     window_end   = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
@@ -129,15 +113,7 @@ def print_results(results: pd.DataFrame,
                   label:   str,
                   gamma:   float = TRANSACTION_COST,
                   show_theoretical_hhi: bool = False) -> None:
-    """Print performance summary.
-
-    Args:
-        results:               DataFrame of monthly portfolio results
-        label:                 display name for the model
-        gamma:                 transaction cost rate
-        show_theoretical_hhi:  if True, print 1/N theoretical HHI minimum
-                               (only meaningful for equal-weight portfolios)
-    """
+    """show_theoretical_hhi: also prints the 1/K lower bound; only meaningful for equal-weight."""
     clean     = results.dropna(subset=["excess_ret", "rf", "turnover"])
     excess    = clean["excess_ret"].values
     rf        = clean["rf"].values

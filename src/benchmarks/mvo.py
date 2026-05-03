@@ -1,33 +1,11 @@
 """
-Benchmark: Mean-Variance Optimization (Markowitz)
+Mean-variance optimization — two variants:
 
-Two versions as per Step 12 methodology:
+(a) Unconstrained MVO: maximize Sharpe, long-only bounds [0, 1], no cardinality constraint.
+(b) Constrained MVO:   maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
+    (QP cannot handle cardinality, so no K constraint here.)
 
-(a) Unconstrained MVO:
-    - Maximize Sharpe ratio
-    - Long-only: weight bounds [0.0, 1.0]
-    - No cardinality constraint
-    - No turnover penalty
-    - Cite: DeMiguel et al. (2009)
-
-(b) Constrained MVO (QP):
-    - Maximize Sharpe ratio
-    - Long-only, max concentration: weight bounds [0.0, 0.15]
-    - Budget constraint: weights sum to 1
-    - No cardinality constraint (QP cannot handle it)
-    - Cite: Jagannathan & Ma (2003)
-
-Both use:
-- Same 60-month rolling estimation window as GA
-- Same full eligible universe at each rebalancing date (~867 stocks)
-- Same transaction cost model (γ = 0.3%)
-- Sample mean for expected returns
-- Sample covariance matrix for risk
-
-References:
-- Markowitz (1952): Mean-variance framework
-- Jagannathan & Ma (2003): Weight constraints as covariance shrinkage
-- DeMiguel et al. (2009): Out-of-sample evaluation protocol
+Both use the same 60-month estimation window, full universe (~867 stocks), and γ = 0.3%.
 """
 
 import numpy as np
@@ -52,14 +30,11 @@ from src.utils.portfolio import (
     get_estimation_window
 )
 
-# ── Constants ─────────────────────────────────────────────────────────────────
 W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
 W_MIN_CONSTRAINED   = 0.0
 W_MAX_CONSTRAINED   = 0.15
 
-
-# ── Optimization ──────────────────────────────────────────────────────────────
 
 def negative_sharpe(weights: np.ndarray,
                     mu:      np.ndarray,
@@ -78,22 +53,7 @@ def optimize_mvo(mu:         np.ndarray,
                  w_max:      float,
                  n_restarts: int = 1,
                  rng:        np.random.Generator = None) -> np.ndarray:
-    """
-    Maximize Sharpe ratio subject to weight bounds and budget constraint.
-
-    Uses scipy SLSQP. Falls back to equal weights on solver failure.
-
-    Args:
-        mu:         expected returns vector (N,)
-        sigma:      covariance matrix (N, N)
-        w_min:      minimum weight per stock
-        w_max:      maximum weight per stock
-        n_restarts: number of random starting points
-        rng:        numpy Generator for reproducibility
-
-    Returns:
-        Optimal weight vector (N,).
-    """
+    """Maximize Sharpe (SLSQP, n_restarts random starts). Falls back to equal weights on failure."""
     if rng is None:
         rng = np.random.default_rng(seed=42)
 
@@ -132,8 +92,6 @@ def optimize_mvo(mu:         np.ndarray,
     best_weights = best_weights / best_weights.sum()
     return best_weights
 
-
-# ── Single Period Processing ──────────────────────────────────────────────────
 
 def _process_single_period(t:            pd.Timestamp,
                             apply_date:   pd.Timestamp,
@@ -189,26 +147,14 @@ def _process_single_period(t:            pd.Timestamp,
     return result, compute_drift_weights(weights, stock_returns), valid_permnos
 
 
-# ── Main Runner ───────────────────────────────────────────────────────────────
-
 def run_mvo(universe:    pd.DataFrame,
             returns:     pd.DataFrame,
             constrained: bool  = False,
             gamma:       float = TRANSACTION_COST,
             seed:        int   = 42) -> pd.DataFrame:
     """
-    Run MVO strategy over all rebalancing dates.
-
-    Args:
-        universe:    DataFrame with columns [date, permno]
-        returns:     DataFrame with columns [date, permno, ret, rf, excess_ret]
-        constrained: if True use weight bounds [0.0, 0.15] (Jagannathan & Ma 2003),
-                     if False use [0.0, 1.0] (long-only, unconstrained)
-        gamma:       proportional transaction cost rate
-        seed:        random seed for reproducibility
-
-    Returns:
-        DataFrame with monthly results
+    Run MVO over all rebalancing dates.
+    constrained=True uses bounds [0, 0.15]; False uses [0, 1.0].
     """
     rng   = np.random.default_rng(seed)
     w_min = W_MIN_CONSTRAINED if constrained else W_MIN_UNCONSTRAINED
@@ -240,8 +186,6 @@ def run_mvo(universe:    pd.DataFrame,
 
     return pd.DataFrame(results)
 
-
-# ── Entry Point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     universe, returns = load_data()

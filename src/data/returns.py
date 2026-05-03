@@ -1,15 +1,6 @@
 """
-Excess Returns Computation
-Merges CRSP monthly returns with the risk-free rate to compute
-monthly excess returns for all stocks in the eligible universe.
-
-Excess return = MthRet - rf (monthly decimal)
-
-This is the final processed data file used by all models:
-- GA optimization
-- MVO benchmarks
-- 1/N benchmark
-- Evaluation metrics
+Merges CRSP returns with rf to compute monthly excess returns (MthRet − rf).
+Output used by GA, MVO, 1/N, and evaluation modules.
 """
 
 import pandas as pd
@@ -45,20 +36,9 @@ def compute_excess_returns(universe:  pd.DataFrame,
                            crsp:      pd.DataFrame,
                            rf:        pd.DataFrame) -> pd.DataFrame:
     """
-    Compute monthly excess returns for all stocks in the eligible universe.
-
-    CRSP dates are end-of-month (e.g. 2005-01-31).
-    FRED dates are start-of-month (e.g. 2005-01-01).
-    Both refer to the same calendar month — matched on year-month period.
-
-    Returns long-format DataFrame with columns:
-    - date       : end-of-month date (CRSP convention)
-    - permno     : stock identifier
-    - ret        : raw monthly total return (MthRet, includes delisting)
-    - rf         : monthly risk-free rate (decimal)
-    - excess_ret : ret - rf
+    CRSP dates are end-of-month (e.g. 2005-01-31); FRED dates are start-of-month.
+    Matched on year-month period — same calendar month, different day convention.
     """
-    # Merge rf onto crsp by year-month period
     crsp = crsp.copy()
     crsp["year_month"] = crsp["date"].dt.to_period("M")
     rf = rf.copy()
@@ -70,10 +50,8 @@ def compute_excess_returns(universe:  pd.DataFrame,
         how="left"
     )
 
-    # Compute excess return
     crsp["excess_ret"] = crsp["ret"] - crsp["rf"]
 
-    # Keep only stocks that appear in the eligible universe
     eligible_permnos = universe["permno"].unique()
     crsp_eligible = crsp[crsp["permno"].isin(eligible_permnos)].copy()
 
@@ -87,23 +65,19 @@ def validate_excess_returns(df: pd.DataFrame) -> None:
     """Sanity checks on excess returns."""
     print("\n--- Validation ---")
 
-    # Check rf merged correctly
     missing_rf = df["rf"].isna().sum()
     assert missing_rf == 0, f"Missing rf for {missing_rf:,} rows"
     print("✓ No missing risk-free rate values")
 
-    # Check excess returns look reasonable
     print("✓ Excess return stats:")
     print(f"  Mean  : {df['excess_ret'].mean():.4f}")
     print(f"  Std   : {df['excess_ret'].std():.4f}")
     print(f"  Min   : {df['excess_ret'].min():.4f}")
     print(f"  Max   : {df['excess_ret'].max():.4f}")
 
-    # Check date range
     print(f"✓ Date range: {df['date'].min().date()} "
           f"to {df['date'].max().date()}")
 
-    # Check rf range
     print(f"✓ rf range: {df['rf'].min():.6f} to {df['rf'].max():.6f}")
 
     print("--- Validation passed ---\n")

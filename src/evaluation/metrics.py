@@ -1,15 +1,5 @@
-"""Evaluation Metrics
-
-All performance metrics used to evaluate portfolio performance.
-All returns are assumed to be monthly. Annualization uses:
-- Returns:    × 12
-- Volatility: × √12
-- Sharpe:     annualized excess return / annualized volatility
-
-References:
-- Sharpe (1994): Sharpe ratio
-- Sortino & Price (1994): Sortino ratio
-- DeMiguel et al. (2009): turnover and transaction cost definitions
+"""
+Monthly returns throughout. Annualization: returns × 12, vol × √12, Sharpe = ann. excess / ann. vol.
 """
 
 import pandas as pd
@@ -17,34 +7,18 @@ import numpy as np
 
 ANNUALIZATION_FACTOR = 12
 SQRT_12              = np.sqrt(ANNUALIZATION_FACTOR)
-TRANSACTION_COST     = 0.003  # γ = 0.3% (Step 7)
+TRANSACTION_COST     = 0.003  # γ = 0.3%
 
 
 def annualized_return(excess_returns: np.ndarray) -> float:
-    """
-    Annualized mean excess return.
-
-    Args:
-        excess_returns: array of monthly excess returns (ret - rf)
-
-    Returns:
-        Annualized mean excess return (scalar)
-    """
+    """Annualized mean excess return (μ̄ × 12)."""
     return float(np.mean(excess_returns) * ANNUALIZATION_FACTOR)
 
 
 def annualized_volatility(excess_returns: np.ndarray) -> float:
     """
-    Annualized standard deviation of excess returns.
-
-    Uses ddof=1 (sample std). Returns max(vol, 0.0) to guard
-    against floating point noise producing tiny negative values.
-
-    Args:
-        excess_returns: array of monthly excess returns
-
-    Returns:
-        Annualized volatility (scalar, >= 0)
+    Annualized std of excess returns (ddof=1, × √12).
+    Clipped to 0.0 to guard against floating-point noise.
     """
     vol = float(np.std(excess_returns, ddof=1) * SQRT_12)
     return max(vol, 0.0)
@@ -52,19 +26,8 @@ def annualized_volatility(excess_returns: np.ndarray) -> float:
 
 def sharpe_ratio(excess_returns: np.ndarray) -> float:
     """
-    Annualized Sharpe ratio.
-
-    Sharpe = annualized mean excess return / annualized volatility
-
-    Note: computed on excess returns (already rf-subtracted),
-    so no additional rf subtraction needed here.
-
-    Args:
-        excess_returns: array of monthly excess returns (ret - rf)
-
-    Returns:
-        Annualized Sharpe ratio (scalar).
-        Returns 0.0 if vol < 1e-10 (flat or near-flat returns).
+    Input is excess returns — no additional rf subtraction.
+    Returns 0.0 when vol < 1e-10.
     """
     vol = annualized_volatility(excess_returns)
     if vol < 1e-10:
@@ -74,17 +37,8 @@ def sharpe_ratio(excess_returns: np.ndarray) -> float:
 
 def sortino_ratio(excess_returns: np.ndarray) -> float:
     """
-    Annualized Sortino ratio.
-
-    Sortino = annualized mean excess return / annualized downside deviation
-    Downside deviation uses only returns below zero (below risk-free rate).
-
-    Args:
-        excess_returns: array of monthly excess returns (ret - rf)
-
-    Returns:
-        Annualized Sortino ratio (scalar).
-        Returns 0.0 if no downside returns or downside vol < 1e-10.
+    Downside deviation uses returns below zero (below risk-free rate).
+    Returns 0.0 if no downside returns or downside vol < 1e-10.
     """
     downside = excess_returns[excess_returns < 0]
     if len(downside) == 0:
@@ -96,16 +50,7 @@ def sortino_ratio(excess_returns: np.ndarray) -> float:
 
 
 def max_drawdown(cumulative_returns: np.ndarray) -> float:
-    """
-    Maximum drawdown — largest peak-to-trough loss.
-
-    Args:
-        cumulative_returns: array of cumulative portfolio values
-                           (e.g. starting at 1.0, growing over time)
-
-    Returns:
-        Maximum drawdown as a negative fraction (e.g. -0.45 = -45%)
-    """
+    """Largest peak-to-trough loss. Returns negative fraction (e.g. −0.45 = −45%)."""
     peak     = np.maximum.accumulate(cumulative_returns)
     drawdown = (cumulative_returns - peak) / peak
     return float(np.min(drawdown))
@@ -113,19 +58,7 @@ def max_drawdown(cumulative_returns: np.ndarray) -> float:
 
 def compute_cumulative_returns(excess_returns: np.ndarray,
                                rf:             np.ndarray) -> np.ndarray:
-    """
-    Compute cumulative portfolio value from monthly excess returns.
-
-    Total return = excess return + rf
-    Cumulative value starts at 1.0 and compounds monthly.
-
-    Args:
-        excess_returns: array of monthly excess returns
-        rf:             array of monthly risk-free rates (same length)
-
-    Returns:
-        Array of cumulative portfolio values starting at 1.0
-    """
+    """Compound monthly (excess_ret + rf) into a cumulative value series starting at 1.0."""
     total_returns = excess_returns + rf
     return np.cumprod(1 + total_returns)
 
@@ -133,100 +66,35 @@ def compute_cumulative_returns(excess_returns: np.ndarray,
 def portfolio_turnover(weights_current:  np.ndarray,
                        weights_previous: np.ndarray) -> float:
     """
-    Portfolio turnover between two rebalancing periods.
-
-    Turnover = sum(|w_t - w_{t-1}|) / 2
-
-    where w_{t-1} is the pre-rebalance weight AFTER drift
-    (not the previous target weight).
-
-    Args:
-        weights_current:  target weights at time t (sums to 1)
-        weights_previous: pre-rebalance weights at t (after drift, sums to 1)
-
-    Returns:
-        Turnover as a fraction between 0 and 1
+    Σ|w_t − w_{t-1}| / 2 where w_{t-1} is the post-drift weight before rebalancing.
     """
     return float(np.sum(np.abs(weights_current - weights_previous)) / 2)
 
 
 def transaction_cost(turnover: float,
                      gamma:    float = TRANSACTION_COST) -> float:
-    """
-    Proportional transaction cost.
-
-    Cost = γ × turnover
-
-    Args:
-        turnover: portfolio turnover (fraction)
-        gamma:    proportional cost per unit traded (default 0.3%)
-
-    Returns:
-        Transaction cost as a fraction of portfolio value
-    """
+    """γ × turnover."""
     return float(gamma * turnover)
 
 
 def net_return(gross_return: float,
                turnover:     float,
                gamma:        float = TRANSACTION_COST) -> float:
-    """
-    Net portfolio return after transaction costs.
-
-    net_return = gross_return - γ × turnover
-
-    Args:
-        gross_return: gross portfolio return for the period
-        turnover:     portfolio turnover for the period
-        gamma:        proportional transaction cost
-
-    Returns:
-        Net return after costs
-    """
+    """gross_return − γ × turnover."""
     return gross_return - transaction_cost(turnover, gamma)
 
 
 def herfindahl_index(weights: np.ndarray) -> float:
-    """
-    Herfindahl-Hirschman Index (HHI) — portfolio concentration.
-
-    HHI = sum(w_i^2)
-
-    Interpretation:
-    - HHI = 1/N for equal-weight portfolio (minimum concentration)
-    - HHI = 1.0  for single-asset portfolio (maximum concentration)
-
-    Args:
-        weights: array of portfolio weights (sums to 1, all >= 0)
-
-    Returns:
-        HHI value between 1/N and 1.0
-    """
+    """HHI = Σw_i². Range: [1/K, 1.0] for equal-weight to single-asset."""
     return float(np.sum(weights ** 2))
 
-
-# ── Summary Function ──────────────────────────────────────────────────────────
 
 def compute_all_metrics(excess_returns: np.ndarray,
                         rf:             np.ndarray,
                         turnovers:      np.ndarray,
                         gamma:          float = TRANSACTION_COST
                         ) -> dict:
-    """
-    Compute all evaluation metrics for a portfolio return series.
-
-    This is the main function called by the results tables.
-    All inputs should cover the full out-of-sample period.
-
-    Args:
-        excess_returns: monthly excess returns (ret - rf), length T
-        rf:             monthly risk-free rates, length T
-        turnovers:      monthly portfolio turnovers, length T
-        gamma:          proportional transaction cost rate
-
-    Returns:
-        Dictionary of annualized performance metrics
-    """
+    """Returns annualized gross and net performance metrics as a dict."""
     costs      = np.array([transaction_cost(to, gamma) for to in turnovers])
     net_excess = excess_returns - costs
 
@@ -247,25 +115,14 @@ def compute_all_metrics(excess_returns: np.ndarray,
         "ann_return_net"      : annualized_return(net_excess),
         "max_drawdown_net"    : max_drawdown(cumulative_net),
 
-        # Trading activity
         "avg_turnover"        : float(np.mean(turnovers)),
         "avg_transaction_cost": float(np.mean(costs)),
         "total_cost"          : float(np.sum(costs)),
     }
 
 
-# ── Formatting ────────────────────────────────────────────────────────────────
-
 def format_metrics(metrics: dict) -> pd.DataFrame:
-    """
-    Format metrics dictionary into a readable DataFrame for thesis Table 1.
-
-    Args:
-        metrics: output of compute_all_metrics()
-
-    Returns:
-        Single-row DataFrame with formatted metric names
-    """
+    """Format compute_all_metrics() output into a single-row DataFrame for Table 1."""
     display_names = {
         "ann_return_net"      : "Annualized Return (net)",
         "ann_vol"             : "Annualized Volatility",

@@ -1,26 +1,9 @@
 """
-Figure 6 — Mean-Variance Efficient Frontier (selected periods)
+Figure 6 — Mean-Variance Efficient Frontier at representative dates.
 
-For 3 representative rebalancing dates:
-- Pre-crisis : 2007-01-01
-- Post-crisis: 2010-01-01
-- Recent     : 2020-01-01
-
-At each date:
-1. Recompute mu and sigma from the 60-month estimation window
-2. Trace the efficient frontier via parametric sweep
-3. Overlay actual portfolio positions of GA, constrained MVO,
-   unconstrained MVO, and 1/N as scatter points
-
-GA weights are obtained by running run_ga once at each date with a
-reduced generation budget (N_GENS_FRONTIER=50) for speed. This is
-illustrative only — the main experiment used 200 generations.
-
-Note: All positions use in-sample estimates (mu, sigma from 60-month
-window). This figure is illustrative — out-of-sample performance is
-evaluated separately.
-
-Output: results/figures/F6_frontier.png
+For each of 3 dates, traces the frontier and overlays actual GA, MVO, and 1/N positions.
+GA uses N_GENS_FRONTIER=50 (illustrative only; main experiment used 200).
+All positions use in-sample μ/Σ — not out-of-sample performance.
 """
 
 import numpy as np
@@ -36,7 +19,6 @@ from src.benchmarks.mvo import optimize_mvo
 from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga
 
-# ── Config ────────────────────────────────────────────────────────────────────
 REPR_DATES  = ["2007-01-01", "2010-01-01", "2020-01-01"]
 DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
@@ -75,13 +57,10 @@ plt.rcParams.update({
 })
 
 
-# ── Frontier Computation ──────────────────────────────────────────────────────
-
 def min_variance_portfolio(sigma:         np.ndarray,
                            target_return: float,
                            mu:            np.ndarray,
                            w_max:         float = 1.0) -> np.ndarray | None:
-    """Minimum variance portfolio for a given target return."""
     N = len(mu)
     constraints = [
         {"type": "eq", "fun": lambda w: np.sum(w) - 1.0},
@@ -135,19 +114,12 @@ def portfolio_position(weights: np.ndarray,
     return vol, ret
 
 
-# ── Portfolio Weights ─────────────────────────────────────────────────────────
-
 def get_portfolio_weights(mu:       np.ndarray,
                           sigma:    np.ndarray,
                           n_assets: int) -> dict:
     """
-    Compute portfolio weights for each strategy at a given date.
-
-    GA: single run_ga call with reduced N_GENS_FRONTIER=50 generations
-        (illustrative only — main experiment used 200 generations).
-        Module-level N_GENS is temporarily overridden and restored.
-    MVO: optimize_mvo with same bounds as main experiment.
-    1/N: equal weight.
+    GA: single run_ga with N_GENS_FRONTIER=50 (illustrative); N_GENS temporarily overridden.
+    MVO: same bounds as main experiment. 1/N: equal weight.
     """
     rng = np.random.default_rng(BASE_SEED)
 
@@ -198,8 +170,6 @@ def get_portfolio_weights(mu:       np.ndarray,
         "1/N"              : ew_w,
     }
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def run_frontier() -> None:
     print("Loading data...")

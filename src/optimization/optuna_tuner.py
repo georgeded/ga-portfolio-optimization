@@ -1,42 +1,24 @@
 """
-src/optimization/optuna_tuner.py
-
-Hyperparameter tuning for the GA using Optuna.
+GA hyperparameter tuner (Optuna, TPE sampler).
 
 Tuning period : Jan 2005 – Dec 2012  (96 periods)
-Evaluation    : Jan 2013 – Dec 2025  (runner.py with fixed params)
+Objective     : maximise net Sharpe on the tuning period
 
-Parameters tuned:
+Parameters:
     PC      ∈ [0.60, 0.95]   crossover probability
     PM      ∈ [0.01, 0.30]   per-operator mutation probability
     SIGMA_M ∈ [0.01, 0.15]   Gaussian mutation std
     LAMBDA  ∈ [0.00, 2.00]   turnover penalty coefficient
 
-Objective: maximize net Sharpe ratio on the tuning period.
-Sampler  : TPE (default Optuna, good for 4-dimensional continuous space).
-Storage  : SQLite — trials survive crashes and can be resumed.
-
-Canonical portfolio selection (mirrors runner.py exactly):
-    For each period, compute in-sample fitness for all runs using the
-    trial's LAMBDA and pw_aligned. Select the run at the median of the
-    in-sample fitness distribution as the canonical portfolio for
-    turnover/drift propagation. This eliminates ex-post dependency on
-    realised returns and ensures tuning/deployment are methodologically
-    consistent.
-
 Usage
 -----
-Full tuning (100 trials, 5 runs/period, 100 gens):
+Full (100 trials, 5 runs/period, 100 gens):
     python3 -m src.optimization.optuna_tuner
 
-Debug (5 trials, 3 runs/period, 30 gens, 12 periods):
+Debug (5 trials, 3 runs, 30 gens, 12 periods):
     python3 -m src.optimization.optuna_tuner --debug
 
-Resume interrupted study:
-    python3 -m src.optimization.optuna_tuner  (SQLite storage auto-resumes)
-
-Custom:
-    python3 -m src.optimization.optuna_tuner --n-trials 50 --n-runs 5 --n-gens 100
+Resume: SQLite storage auto-resumes.
 """
 
 import argparse
@@ -68,7 +50,6 @@ from src.utils.portfolio import (
     align_drifted_weights,
 )
 
-# ── Constants ─────────────────────────────────────────────────────────────────
 TUNE_START  = "2005-01-01"
 TUNE_END    = "2012-12-01"   # inclusive — 96 periods
 N_TRIALS    = 100
@@ -80,8 +61,7 @@ STUDY_DB    = os.path.join(OUTPUT_DIR, "study.db")
 BEST_PARAMS = os.path.join(OUTPUT_DIR, "best_params.json")
 
 
-# ── Worker (module-level for pickling) ────────────────────────────────────────
-
+# module-level for pickling
 def _run_single(args: tuple) -> np.ndarray:
     """
     Run one GA instance with trial-specific hyperparameters.
@@ -102,8 +82,6 @@ def _run_single(args: tuple) -> np.ndarray:
     return run_ga(n_assets, mu, sigma, prev_weights, rng)
 
 
-# ── Single-period evaluation ──────────────────────────────────────────────────
-
 def _eval_period(
     t:            pd.Timestamp,
     apply_date:   pd.Timestamp,
@@ -118,19 +96,10 @@ def _eval_period(
     gamma:        float,
 ) -> tuple[dict | None, np.ndarray | None, list | None]:
     """
-    Evaluate one rebalancing period under a given set of hyperparameters.
-
-    Canonical portfolio selection mirrors runner.py exactly:
-    uses median in-sample fitness (not median realised return) to select
-    the representative run for turnover/drift propagation. pw_aligned and
-    params["lambda_"] are both passed to ga_fitness so the turnover penalty
-    term is consistent with what the GA workers optimised against.
-
-    Args:
-        params: dict with keys pc, pm, sigma_m, lambda_
-
-    Returns:
-        (result_row, new_drifted_weights, new_permnos)
+    Evaluate one period under given hyperparameters.
+    Canonical = median in-sample fitness (mirrors runner.py). pw_aligned + lambda_ passed
+    to ga_fitness so the turnover penalty matches what GA workers optimised against.
+    Returns (result_row, new_drifted_weights, new_permnos).
     """
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
@@ -164,9 +133,7 @@ def _eval_period(
     gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
     median_ret    = float(np.median(gross_returns))
 
-    # ── Canonical selection via in-sample fitness (mirrors runner.py) ─────────
-    # pw_aligned and lambda_ are both passed so the turnover penalty term
-    # matches what run_ga was optimising — critical for LAMBDA tuning accuracy.
+    # pw_aligned + lambda_ passed so penalty matches what run_ga optimised (critical for LAMBDA tuning)
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, params["lambda_"])
         for w in all_weights
@@ -193,8 +160,6 @@ def _eval_period(
     return result, new_weights, valid_permnos
 
 
-# ── Optuna objective ──────────────────────────────────────────────────────────
-
 def _make_objective(
     universe:         pd.DataFrame,
     returns:          pd.DataFrame,
@@ -205,14 +170,7 @@ def _make_objective(
     n_workers:        int,
     gamma:            float,
 ):
-    """
-    Returns an Optuna objective closed over the data.
-
-    Maximises net Sharpe ratio over the tuning period.
-
-    The Pool is created once per trial (not per period) to avoid 96 spawn/kill
-    cycles per trial. Workers are kept alive across all periods within a trial.
-    """
+    """Pool created once per trial to avoid 96 spawn/kill cycles."""
     def objective(trial: optuna.Trial) -> float:
         pc      = trial.suggest_float("pc",      0.60, 0.95)
         pm      = trial.suggest_float("pm",      0.01, 0.30)
@@ -231,7 +189,6 @@ def _make_objective(
         prev_weights  = None
         prev_permnos  = None
 
-        # Pool created once per trial — workers persist across all 96 periods
         with mp.Pool(processes=n_workers) as pool:
             for t in tuning_dates:
                 apply_dates = [
@@ -266,8 +223,6 @@ def _make_objective(
     return objective
 
 
-# ── Main tuner ────────────────────────────────────────────────────────────────
-
 def run_tuner(
     n_trials:    int        = N_TRIALS,
     n_runs:      int        = N_RUNS_TUNE,
@@ -275,19 +230,7 @@ def run_tuner(
     max_periods: int | None = None,
     gamma:       float      = TRANSACTION_COST,
 ) -> dict:
-    """
-    Run the Optuna hyperparameter search.
-
-    Args:
-        n_trials:    number of Optuna trials
-        n_runs:      GA runs per period per trial
-        n_gens:      max generations per GA run per trial
-        max_periods: cap tuning periods (None = all 96); use for debug
-        gamma:       transaction cost rate
-
-    Returns:
-        dict of best hyperparameters
-    """
+    """Run Optuna search and return best hyperparameter dict."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     universe, returns = load_data()
@@ -350,7 +293,6 @@ def run_tuner(
             )
         print(f"\nTuning complete in {(time.time()-t0)/60:.1f} min")
 
-    # ── Report and save best params ───────────────────────────────────────────
     best_params = study.best_params
     best_value  = study.best_value
 
@@ -389,8 +331,6 @@ def run_tuner(
 
     return best_params
 
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="GA Optuna hyperparameter tuner")

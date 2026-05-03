@@ -208,8 +208,12 @@ __marimo__/
 .env
 data/raw/
 data/processed/
-results/
+results/*
+!results/figures/
+!results/tables/
+results/figures/*
 !results/figures/*.png
+results/tables/*
 !results/tables/*.png
 __pycache__/
 *.pyc

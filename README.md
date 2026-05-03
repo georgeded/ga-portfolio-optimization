@@ -12,10 +12,10 @@
 
 | Strategy | Sharpe (net) | Return (net) | Vol | Max DD | Avg Turnover |
 |---|---|---|---|---|---|
-| **GA (adaptive K)** | **0.8751** | **14.78%** | 16.89% | -38.16% | 21.8% |
-| Constrained MVO | 0.5557 | — | — | — | 24.1% |
-| Unconstrained MVO | 0.5592 | — | — | — | — |
-| 1/N (~867 stocks) | 0.5237 | — | — | — | — |
+| **GA (adaptive K)** | **0.8751** | **14.78%** | 16.89% | -38.16% | 21.83% |
+| Constrained MVO | 0.5557 | **7.56%** | 13.60% | -40.48% | 24.13% |
+| Unconstrained MVO | 0.5592 | **7.60%** | 13.60% | -38.68% | 24.14% |
+| 1/N (~867 stocks) | 0.5237 | **9.10%** | 17.38% | -52.19% | 5.85% |
 
 GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05). Evaluation period: January 2005 – December 2025, 252 monthly rebalancing periods, transaction cost γ = 0.3%.
 

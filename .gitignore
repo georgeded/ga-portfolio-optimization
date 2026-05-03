@@ -209,6 +209,8 @@ __marimo__/
 data/raw/
 data/processed/
 results/
+!results/figures/*.png
+!results/tables/*.png
 __pycache__/
 *.pyc
 *.parquet

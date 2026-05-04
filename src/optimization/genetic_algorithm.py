@@ -65,7 +65,6 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
 
     return w
 
-# ── Repair Operator ───────────────────────────────────────────────────────────
 
 def repair(weights: np.ndarray,
            rng:     np.random.Generator,
@@ -137,8 +136,6 @@ def repair(weights: np.ndarray,
 
     return w
 
-
-# ── Population Initialization ─────────────────────────────────────────────────
 
 def initialize_population(n_assets:   int,
                            rng: np.random.Generator) -> np.ndarray:

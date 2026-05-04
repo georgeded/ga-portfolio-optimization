@@ -52,7 +52,7 @@ from src.utils.portfolio import (
 
 TUNE_START  = "2005-01-01"
 TUNE_END    = "2012-12-01"   # inclusive — 96 periods
-N_TRIALS    = 100
+N_TRIALS    = 15
 N_RUNS_TUNE = 5              # fewer runs than full experiment to keep trials fast
 N_GENS_TUNE = 100            # fewer gens than full experiment
 BASE_SEED   = 2000           # different from runner.py (1000) to avoid overlap

@@ -78,7 +78,7 @@ ga-portfolio-optimization/
 │   ├── optimization/
 │   │   ├── genetic_algorithm.py  # GA operators, fitness function, main loop
 │   │   ├── runner.py             # Rolling OOS experiment with checkpointing
-│   │   └── optuna_tuner.py       # Hyperparameter search (TPE, 100 trials)
+│   │   └── optuna_tuner.py       # Hyperparameter search (TPE, 15 trials)
 │   ├── evaluation/
 │   │   ├── metrics.py        # Sharpe, Sortino, drawdown, turnover, HHI
 │   │   ├── figures.py        # F1–F5 publication figures

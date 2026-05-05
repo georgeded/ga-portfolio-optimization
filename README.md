@@ -1,6 +1,6 @@
 # GA Portfolio Optimization
 
-**Genetic algorithm for cardinality-constrained portfolio optimization on US equities — BSc CS thesis, VU Amsterdam.**
+Genetic algorithm for cardinality-constrained portfolio optimization on US equities - BSc CS thesis, VU Amsterdam.
 
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -17,15 +17,15 @@
 | Unconstrained MVO | 0.5592 | **7.60%** | 13.60% | -38.68% | 24.14% |
 | 1/N (~867 stocks) | 0.5237 | **9.10%** | 17.38% | -52.19% | 5.85% |
 
-GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05). Evaluation period: January 2005 – December 2025, 252 monthly rebalancing periods, transaction cost γ = 0.3%.
+GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05). Evaluation period: January 2005 - December 2025, 252 monthly rebalancing periods, transaction cost γ = 0.3%.
 
 ---
 
 ## Overview
 
-Mean-variance optimization breaks down when the estimation window is short relative to the number of assets — a T=60 month window covering N≈867 stocks produces a near-singular covariance matrix. This project asks whether a constraint-aware evolutionary algorithm can produce more robust out-of-sample portfolios by directly controlling portfolio size, weight concentration, and turnover.
+Mean-variance optimization breaks down when the estimation window is short relative to the number of assets - with T=60 months and N≈867 stocks, the sample covariance matrix is nearly singular. The central question here is whether an evolutionary algorithm that directly constrains portfolio size, weight concentration, and turnover can produce better out-of-sample results than MVO and naive diversification.
 
-The GA selects K ∈ [10, 30] stocks per period, optimises a Sharpe-minus-turnover fitness function using Optuna-tuned operators, and is evaluated on 20 years of rolling out-of-sample returns. Against MVO and 1/N benchmarks on the same universe and cost model, the GA achieves a net Sharpe of 0.8751 — outperforming the next-best benchmark by 0.28 Sharpe points, with statistical significance at the 5% level.
+The GA selects K ∈ [10, 30] stocks each period and optimises a Sharpe-minus-turnover fitness function with Optuna-tuned parameters, evaluated over 20 years of rolling monthly returns. On the same universe and cost model as the benchmarks, it achieves a net Sharpe of 0.8751 - 0.28 points above the next-best benchmark, significant at α = 0.05.
 
 ---
 
@@ -70,7 +70,7 @@ ga-portfolio-optimization/
 │   ├── data/
 │   │   ├── loader.py         # CRSP CSV → parquet
 │   │   ├── universe.py       # Eligible universe construction per rebalancing date
-│   │   ├── returns.py        # Excess return computation (ret − rf)
+│   │   ├── returns.py        # Excess return computation (ret - rf)
 │   │   └── risk_free_rate.py # FRED DTB3 processing
 │   ├── benchmarks/
 │   │   ├── mvo.py            # Unconstrained and constrained MVO (SLSQP)
@@ -110,12 +110,12 @@ ga-portfolio-optimization/
 
 **Universe construction**
 - 60-month burn-in → first rebalancing date: January 2005
-- Stock eligible iff: exactly 60 non-missing returns in the estimation window and market cap ≥ $2B at t−1
+- Stock eligible iff: exactly 60 non-missing returns in the estimation window and market cap ≥ $2B at t-1
 - Covariance regularized as Σ + 1e-4·I (T=60 << N≈867 makes sample Σ near-singular)
 
 **Genetic Algorithm**
 - Chromosome: real-valued weight vector with K ∈ [10, 30] non-zero entries, w_i ∈ [0.02, 0.15], Σw = 1
-- Fitness: monthly Sharpe − λ·Turnover (λ = 1.8437 from Optuna)
+- Fitness: monthly Sharpe - λ·Turnover (λ = 1.8437 from Optuna)
 - Operators: tournament selection (k=3), blend crossover (pc=0.6054), Gaussian weight mutation + asset-swap (pm=0.137, σ_m=0.1469)
 - Population: 100 | Generations: 200 | Early stop: 20 stagnant generations
 - Local refinement: greedy pairwise weight-shift hill-climber on best elite each generation

@@ -2,12 +2,10 @@ import numpy as np
 import pandas as pd
 
 from src.evaluation.metrics import compute_all_metrics, TRANSACTION_COST
-ESTIMATION_WINDOW   = 60
+ESTIMATION_WINDOW = 60
 
 
-def get_monthly_returns(returns: pd.DataFrame,
-                        permnos: list,
-                        month:   pd.Timestamp) -> pd.Series:
+def get_monthly_returns(returns: pd.DataFrame, permnos: list, month: pd.Timestamp) -> pd.Series:
     mask = (
         (returns["date"] == month) &
         (returns["permno"].isin(permnos))
@@ -16,17 +14,15 @@ def get_monthly_returns(returns: pd.DataFrame,
     return month_ret.reindex(permnos, fill_value=0.0).fillna(0.0)
 
 
-def get_rf_for_month(returns: pd.DataFrame,
-                     month:   pd.Timestamp) -> float:
+def get_rf_for_month(returns: pd.DataFrame, month: pd.Timestamp) -> float:
     rf_vals = returns.loc[returns["date"] == month, "rf"].dropna()
     return float(rf_vals.iloc[0]) if len(rf_vals) > 0 else 0.0
 
 
-def compute_drift_weights(weights:       np.ndarray,
-                          stock_returns: np.ndarray) -> np.ndarray:
+def compute_drift_weights(weights: np.ndarray, stock_returns: np.ndarray) -> np.ndarray:
     stock_returns = np.nan_to_num(stock_returns, nan=0.0)
-    drifted       = weights * (1 + stock_returns)
-    total         = drifted.sum()
+    drifted = weights * (1 + stock_returns)
+    total = drifted.sum()
     if total <= 0:
         return np.ones(len(weights)) / len(weights)
     return drifted / total
@@ -35,17 +31,15 @@ def compute_drift_weights(weights:       np.ndarray,
 # NOTE: cap_universe() is kept for reference but not used in the
 # main experiment. All models now use the full eligible universe
 # per supervisor feedback (April 2026).
-def cap_universe(universe: pd.DataFrame,
-                 returns:  pd.DataFrame,
-                 top_n:    int = 200) -> pd.DataFrame:
-    returns           = returns.copy()
+def cap_universe(universe: pd.DataFrame, returns: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
+    returns = returns.copy()
     returns["mktcap"] = returns["prc"].abs() * returns["shrout"] * 1000
 
     result_rows = []
     for date, group in universe.groupby("date"):
-        permnos  = group["permno"].tolist()
+        permnos = group["permno"].tolist()
         date_ret = returns[
-            (returns["date"].dt.year  == date.year) &
+            (returns["date"].dt.year == date.year) &
             (returns["date"].dt.month == date.month) &
             (returns["permno"].isin(permnos))
         ][["permno", "mktcap"]].drop_duplicates("permno")
@@ -57,9 +51,7 @@ def cap_universe(universe: pd.DataFrame,
     return pd.DataFrame(result_rows)
 
 
-def align_drifted_weights(prev_weights: np.ndarray,
-                          prev_permnos: list,
-                          curr_permnos: list) -> np.ndarray:
+def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_permnos: list) -> np.ndarray:
     """Reindex drifted weights to the current universe (new/departed stocks → 0).
     Falls back to equal weight if all prior holdings have left the universe.
     """
@@ -70,20 +62,17 @@ def align_drifted_weights(prev_weights: np.ndarray,
     if total > 0:
         aligned = aligned / total
     else:
-        # All previous stocks left universe — treat as full replacement
+        # all previous stocks left universe — treat as full replacement
         aligned = np.ones(len(curr_permnos)) / len(curr_permnos)
     return aligned
 
 
-def get_estimation_window(returns:        pd.DataFrame,
-                          permnos:        list,
-                          rebalance_date: pd.Timestamp) -> tuple:
-    """
-    Build mu and sigma from the 60-month window [t-60, t-1].
-    Drops any stock with a missing observation — ensures full-rank input
+def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: pd.Timestamp) -> tuple:
+    """Build mu and sigma from the 60-month window [t-60, t-1].
+    Drops stocks with any missing observation — ensures full-rank input
     before regularization (sigma + 1e-4 * I).
     """
-    window_end   = rebalance_date - pd.DateOffset(days=1)
+    window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
 
     mask = (
@@ -93,7 +82,7 @@ def get_estimation_window(returns:        pd.DataFrame,
     )
     window_data = returns[mask][["date", "permno", "excess_ret"]]
 
-    ret_matrix    = window_data.pivot(
+    ret_matrix = window_data.pivot(
         index="date", columns="permno", values="excess_ret"
     ).dropna(axis=1)
     valid_permnos = ret_matrix.columns.tolist()
@@ -102,21 +91,19 @@ def get_estimation_window(returns:        pd.DataFrame,
         return None, None, []
 
     ret_array = ret_matrix.values
-    mu        = ret_array.mean(axis=0)
-    sigma     = np.cov(ret_array, rowvar=False)
+    mu = ret_array.mean(axis=0)
+    sigma = np.cov(ret_array, rowvar=False)
     sigma = sigma + 1e-4 * np.eye(len(valid_permnos))
 
     return mu, sigma, valid_permnos
 
 
-def print_results(results: pd.DataFrame,
-                  label:   str,
-                  gamma:   float = TRANSACTION_COST,
+def print_results(results: pd.DataFrame, label: str, gamma: float = TRANSACTION_COST,
                   show_theoretical_hhi: bool = False) -> None:
     """show_theoretical_hhi: also prints the 1/K lower bound; only meaningful for equal-weight."""
-    clean     = results.dropna(subset=["excess_ret", "rf", "turnover"])
-    excess    = clean["excess_ret"].values
-    rf        = clean["rf"].values
+    clean = results.dropna(subset=["excess_ret", "rf", "turnover"])
+    excess = clean["excess_ret"].values
+    rf = clean["rf"].values
     turnovers = clean["turnover"].values
 
     metrics = compute_all_metrics(excess, rf, turnovers, gamma)

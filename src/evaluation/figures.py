@@ -12,40 +12,40 @@ import matplotlib.patches as mpatches
 import os
 
 plt.rcParams.update({
-    "figure.dpi"       : 300,
-    "font.family"      : "serif",
-    "font.size"        : 11,
-    "axes.titlesize"   : 12,
-    "axes.labelsize"   : 11,
-    "legend.fontsize"  : 10,
-    "xtick.labelsize"  : 10,
-    "ytick.labelsize"  : 10,
-    "axes.spines.top"  : False,
+    "figure.dpi": 300,
+    "font.family": "serif",
+    "font.size": 11,
+    "axes.titlesize": 12,
+    "axes.labelsize": 11,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "axes.spines.top": False,
     "axes.spines.right": False,
-    "axes.grid"        : True,
-    "grid.alpha"       : 0.3,
-    "grid.linestyle"   : "--",
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "grid.linestyle": "--",
 })
 
-# Greyscale-compatible styles (readable in B&W print)
+# greyscale-compatible line styles (readable in B&W print)
 STYLES = {
-    "GA"               : {"color": "#000000", "lw": 2.0, "ls": "-"},
+    "GA":                {"color": "#000000", "lw": 2.0, "ls": "-"},
     "Unconstrained MVO": {"color": "#444444", "lw": 1.5, "ls": "--"},
-    "Constrained MVO"  : {"color": "#888888", "lw": 1.5, "ls": "-."},
-    "1/N"              : {"color": "#bbbbbb", "lw": 1.5, "ls": ":"},
+    "Constrained MVO":   {"color": "#888888", "lw": 1.5, "ls": "-."},
+    "1/N":               {"color": "#bbbbbb", "lw": 1.5, "ls": ":"},
 }
 
 OUT_DIR = "results/figures"
 
-# Crisis periods — applied consistently across all time-series figures
+# crisis periods applied consistently across all time-series figures
 CRISES = [
     {"start": "2008-09-01", "end": "2009-06-01",
      "color": "black", "label": "GFC (2008–09)"},
     {"start": "2020-02-01", "end": "2020-04-01",
-     "color": "grey",  "label": "COVID (2020)"},
+     "color": "grey", "label": "COVID (2020)"},
 ]
 
-# Shared legend handles for the 4 strategies — built once, reused
+
 def make_strategy_handles() -> list:
     handles = []
     for name, s in STYLES.items():
@@ -62,16 +62,16 @@ def make_crisis_handles() -> list:
 
 
 def load_all(
-    ga_path      : str = "results/ga/ga_results.parquet",
-    ew_path      : str = "results/benchmarks/equal_weight_full.parquet",
-    mvo_unc_path : str = "results/benchmarks/mvo_unconstrained.parquet",
-    mvo_con_path : str = "results/benchmarks/mvo_constrained.parquet",
+    ga_path: str = "results/ga/ga_results.parquet",
+    ew_path: str = "results/benchmarks/equal_weight_full.parquet",
+    mvo_unc_path: str = "results/benchmarks/mvo_unconstrained.parquet",
+    mvo_con_path: str = "results/benchmarks/mvo_constrained.parquet",
 ) -> dict:
     data = {
-        "GA"               : pd.read_parquet(ga_path),
+        "GA":                pd.read_parquet(ga_path),
         "Unconstrained MVO": pd.read_parquet(mvo_unc_path),
-        "Constrained MVO"  : pd.read_parquet(mvo_con_path),
-        "1/N"              : pd.read_parquet(ew_path),
+        "Constrained MVO":   pd.read_parquet(mvo_con_path),
+        "1/N":               pd.read_parquet(ew_path),
     }
     for name, df in data.items():
         df["date"] = pd.to_datetime(df["date"])
@@ -93,9 +93,9 @@ def cumulative_returns(df: pd.DataFrame) -> np.ndarray:
 
 def rolling_sharpe(df: pd.DataFrame, window: int = 12) -> pd.Series:
     net = pd.Series(df["net_excess_ret"].values, index=df["date"])
-    mu  = net.rolling(window).mean() * 12
+    mu = net.rolling(window).mean() * 12
     vol = net.rolling(window).std(ddof=1) * np.sqrt(12)
-    rs  = (mu / vol.replace(0, np.nan)).clip(-5, 5)
+    rs = (mu / vol.replace(0, np.nan)).clip(-5, 5)
     return rs.dropna()
 
 
@@ -104,7 +104,7 @@ def smooth_series(series: pd.Series, window: int = 6) -> pd.Series:
 
 
 def add_crisis_shading(ax) -> None:
-    """Add shaded crisis periods. No legend label — handled by fig.legend."""
+    """Add shaded crisis periods. Legend handled by fig.legend."""
     for crisis in CRISES:
         ax.axvspan(
             pd.Timestamp(crisis["start"]),
@@ -113,24 +113,19 @@ def add_crisis_shading(ax) -> None:
         )
 
 
-def add_bottom_legend(fig, extra_handles: list = None,
-                      ncol: int = 6) -> None:
-    """
-    Place a shared legend below the figure.
-    Includes strategy lines + crisis patches.
-    extra_handles: additional handles specific to a figure (e.g. mean K line).
-    """
+def add_bottom_legend(fig, extra_handles: list = None, ncol: int = 6) -> None:
+    """Place a shared legend below the figure, including strategy lines + crisis patches."""
     handles = make_strategy_handles() + make_crisis_handles()
     if extra_handles:
         handles += extra_handles
 
     fig.legend(
-        handles        = handles,
-        loc            = "lower center",
-        ncol           = ncol,
-        framealpha     = 0.9,
-        bbox_to_anchor = (0.5, -0.02),
-        fontsize       = 10,
+        handles=handles,
+        loc="lower center",
+        ncol=ncol,
+        framealpha=0.9,
+        bbox_to_anchor=(0.5, -0.02),
+        fontsize=10,
     )
 
 
@@ -181,7 +176,7 @@ def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for name, df in data.items():
-        s  = STYLES[name]
+        s = STYLES[name]
         rs = rolling_sharpe(df, window)
         ax.plot(rs.index, rs.values,
                 color=s["color"], lw=s["lw"], ls=s["ls"])
@@ -211,7 +206,7 @@ def plot_turnover(data: dict) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for name, df in data.items():
-        s  = STYLES[name]
+        s = STYLES[name]
         to = pd.Series(df["turnover"].values * 100, index=df["date"])
         to_smooth = smooth_series(to, window=6)
         ax.plot(to_smooth.index, to_smooth.values,
@@ -241,7 +236,7 @@ def plot_hhi(data: dict) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for name, df in data.items():
-        s   = STYLES[name]
+        s = STYLES[name]
         hhi = pd.Series(df["hhi"].values, index=df["date"])
         hhi_smooth = smooth_series(hhi, window=6)
         ax.plot(hhi_smooth.index, hhi_smooth.values,
@@ -268,7 +263,7 @@ def plot_hhi(data: dict) -> None:
 
 
 def plot_cardinality(data: dict) -> None:
-    df  = data["GA"]
+    df = data["GA"]
     fig, ax = plt.subplots(figsize=(10, 4))
 
     ax.plot(df["date"], df["n_stocks"],
@@ -301,12 +296,12 @@ def plot_cardinality(data: dict) -> None:
                       label=f"Mean K = {df['n_stocks'].mean():.1f}"),
     ]
     fig.legend(
-        handles        = extra + make_crisis_handles(),
-        loc            = "lower center",
-        ncol           = 5,
-        framealpha     = 0.9,
-        bbox_to_anchor = (0.5, -0.02),
-        fontsize       = 10,
+        handles=extra + make_crisis_handles(),
+        loc="lower center",
+        ncol=5,
+        framealpha=0.9,
+        bbox_to_anchor=(0.5, -0.02),
+        fontsize=10,
     )
 
     add_caption(fig,

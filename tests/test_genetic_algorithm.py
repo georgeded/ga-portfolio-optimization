@@ -1,18 +1,10 @@
 """
-tests/test_genetic_algorithm.py
-Research-grade validation for src/optimization/genetic_algorithm.py
+Unit tests for src/optimization/genetic_algorithm.py.
 
-Components tested:
-    project_bounded_simplex  — bounded simplex projection (mathematical core)
-    repair                   — constraint enforcement operator
-    initialize_population    — feasible population generation
-    fitness                  — objective function with turnover penalty
-    tournament_select        — parent selection operator
-    crossover                — two-child crossover operator
-    mutate                   — Gaussian + asset-swap mutation operator
+Covers: project_bounded_simplex, repair, initialize_population,
+fitness, tournament_select, crossover, mutate, local_refine, run_ga.
 
-Run with:
-    python3 -m pytest tests/test_genetic_algorithm.py -v
+Run with: python3 -m pytest tests/test_genetic_algorithm.py -v
 """
 
 import numpy as np
@@ -31,9 +23,7 @@ from src.optimization.genetic_algorithm import (
 from src.evaluation.metrics import portfolio_turnover
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Module-level helpers
-# ─────────────────────────────────────────────────────────────────────────────
+# --- helpers ---
 
 def make_feasible_portfolio(rng, n=50):
     """Return one verified-feasible portfolio of length n."""
@@ -56,16 +46,14 @@ def make_mu_sigma(n=5, monthly_ret=0.01, monthly_std=0.04):
     return mu, sigma
 
 
-# Fixtures
-# ─────────────────────────────────────────────────────────────────────────────
+# --- fixtures ---
 
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)
 
 
-# project_bounded_simplex
-# ─────────────────────────────────────────────────────────────────────────────
+# --- project_bounded_simplex ---
 
 class TestProjectBoundedSimplex:
 
@@ -105,11 +93,11 @@ class TestProjectBoundedSimplex:
         """
         v = np.full(5, 0.2)
 
-        # Case (a): n * lower > 1  (5 * 0.3 = 1.5 > 1)
+        # case (a): n * lower > 1  (5 * 0.3 = 1.5 > 1)
         with pytest.raises(ValueError):
             project_bounded_simplex(v, lower=0.3, upper=0.5)
 
-        # Case (b): n * upper < 1  (5 * 0.1 = 0.5 < 1)
+        # case (b): n * upper < 1  (5 * 0.1 = 0.5 < 1)
         with pytest.raises(ValueError):
             project_bounded_simplex(v, lower=0.01, upper=0.1)
 
@@ -123,8 +111,7 @@ class TestProjectBoundedSimplex:
         assert np.all(w <= W_MAX + 1e-10)
 
 
-# repair
-# ─────────────────────────────────────────────────────────────────────────────
+# --- repair ---
 
 class TestRepair:
 
@@ -167,7 +154,7 @@ class TestRepair:
         result = repair(w, rng)
         self._assert_feasible(result)
 
-    def test_idempotence(self, rng):
+    def test_idempotence(self):
         """repair(repair(w)) must equal repair(w) independent of RNG state."""
         N    = 200
         rng2 = np.random.default_rng(99)
@@ -178,9 +165,9 @@ class TestRepair:
             if w.sum() > 0:
                 w /= w.sum()
 
-            # Use different seeds for first and second repair call to expose
+            # use different seeds for first and second repair call to expose
             # any stochastic inconsistency — true idempotence must hold
-            # regardless of which random choices are made during repair.
+            # regardless of which random choices are made during repair
             r1 = repair(w,         np.random.default_rng(0))
             r2 = repair(r1.copy(), np.random.default_rng(1))
             np.testing.assert_allclose(r1, r2, atol=1e-10,
@@ -238,8 +225,7 @@ class TestRepair:
                 "repair produced NaN output"
 
 
-# initialize_population
-# ─────────────────────────────────────────────────────────────────────────────
+# --- initialize_population ---
 
 class TestInitializePopulation:
 
@@ -292,8 +278,7 @@ class TestInitializePopulation:
             f"Only {len(np.unique(cardinalities))} distinct cardinalities"
 
 
-# fitness
-# ─────────────────────────────────────────────────────────────────────────────
+# --- fitness ---
 
 class TestFitness:
 
@@ -365,8 +350,7 @@ class TestFitness:
                fitness(w, mu, sigma,     lambda_=0.0)
 
 
-# tournament_select
-# ─────────────────────────────────────────────────────────────────────────────
+# --- tournament_select ---
 
 class TestTournamentSelect:
 
@@ -439,8 +423,7 @@ class TestTournamentSelect:
             assert winner.shape == (N,)
 
 
-# crossover
-# ─────────────────────────────────────────────────────────────────────────────
+# --- crossover ---
 
 class TestCrossover:
 
@@ -490,10 +473,7 @@ class TestCrossover:
         self._assert_feasible(c2, "identical-parent c2")
 
     def test_cardinality_varies_across_children(self, rng):
-        """
-        Random K_child draw should produce multiple distinct cardinalities —
-        crossover must be the source of cardinality exploration.
-        """
+        """Random K_child draw should produce multiple distinct cardinalities."""
         p1, p2 = two_feasible(rng, n=200)
         cards  = set()
         for _ in range(200):
@@ -531,8 +511,7 @@ class TestCrossover:
             self._assert_feasible(c, label)
 
 
-# mutate
-# ─────────────────────────────────────────────────────────────────────────────
+# --- mutate ---
 
 class TestMutate:
 
@@ -602,10 +581,7 @@ class TestMutate:
             f"{violations}/10,000 mutate outputs infeasible"
 
     def test_sigma_m_upper_bound_still_feasible(self):
-        """
-        At SIGMA_M=0.15 (Optuna upper bound), repair must handle aggressive
-        perturbations — feasibility must hold even at maximum noise level.
-        """
+        """At SIGMA_M=0.15 (Optuna upper bound), feasibility must hold even at max noise."""
         import src.optimization.genetic_algorithm as ga
         original   = ga.SIGMA_M
         ga.SIGMA_M = 0.15
@@ -627,8 +603,7 @@ class TestMutate:
             ga.SIGMA_M = original
 
 
-# local_refine
-# ─────────────────────────────────────────────────────────────────────────────
+# --- local_refine ---
 
 from src.optimization.genetic_algorithm import local_refine, run_ga
 
@@ -716,8 +691,7 @@ class TestLocalRefine:
         assert isinstance(f_out, float)
 
 
-# run_ga
-# ─────────────────────────────────────────────────────────────────────────────
+# --- run_ga ---
 
 class TestRunGA:
 
@@ -744,7 +718,6 @@ class TestRunGA:
     def test_fitness_positive_for_positive_mu(self):
         """With positive expected returns, GA should find a portfolio with positive fitness."""
         mu, sigma = make_estimation_data(n=50, seed=1)
-        # Force clearly positive mu
         mu = np.abs(mu) + 0.005
         w  = run_ga(50, mu, sigma, None, np.random.default_rng(2))
         f  = fitness(w, mu, sigma, None, LAMBDA)

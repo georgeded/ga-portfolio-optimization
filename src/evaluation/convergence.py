@@ -1,11 +1,9 @@
 """
-Figure A1 — GA Convergence (Tuned vs Default Parameters)
+Figure A1 — GA Convergence (Tuned vs Default Parameters).
 
 Three dates: Jan 2007 (pre-crisis), Jan 2010 (post-crisis), Jan 2020 (recent).
 N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, λ inactive).
-λ excluded from this diagnostic — comparison isolates pc/pm/sigma_m only.
-
-Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png
+Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png.
 """
 
 import numpy as np
@@ -18,118 +16,114 @@ from src.utils.portfolio import get_estimation_window
 from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga, N_GENS
 
-REPR_DATES  = ["2007-01-01", "2010-01-01", "2020-01-01"]
+REPR_DATES = ["2007-01-01", "2010-01-01", "2020-01-01"]
 DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Post-crisis (Jan 2010)",
                "Recent (Jan 2020)"]
 N_RUNS_CONV = 8
-BASE_SEED   = 42
-OUT_DIR     = "results/figures"
+BASE_SEED = 42
+OUT_DIR = "results/figures"
 TUNED_LABEL = "Tuned (Optuna)"
 
 # Tuned parameters (Optuna — best_params.json)
 TUNED_PARAMS = {
-    "pc"      : 0.6054,
-    "pm"      : 0.1370,
-    "sigma_m" : 0.1469,
-    "lambda_" : 1.8437,  # inactive in this diagnostic (prev_weights=None)
-    "label"   : TUNED_LABEL,
+    "pc": 0.6054,
+    "pm": 0.1370,
+    "sigma_m": 0.1469,
+    "lambda_": 1.8437,  # inactive in this diagnostic (prev_weights=None)
+    "label": TUNED_LABEL,
 }
 
-# Default parameters (standard EA literature defaults)
+# Standard EA literature defaults
 DEFAULT_PARAMS = {
-    "pc"      : 0.8,
-    "pm"      : 0.1,
-    "sigma_m" : 0.05,
-    "lambda_" : 0.0,   # also inactive (prev_weights=None)
-    "label"   : "Default",
+    "pc": 0.8,
+    "pm": 0.1,
+    "sigma_m": 0.05,
+    "lambda_": 0.0,
+    "label": "Default",
 }
 
 CONFIG_STYLES = {
-    TUNED_LABEL      : {"lw": 2.0, "ls": "-",  "alpha_band": 0.15},
-    "Default"       : {"lw": 1.6, "ls": "--", "alpha_band": 0.10},
+    TUNED_LABEL: {"lw": 2.0, "ls": "-",  "alpha_band": 0.15},
+    "Default":   {"lw": 1.6, "ls": "--", "alpha_band": 0.10},
 }
 
 DATE_COLORS = ["#000000", "#555555", "#999999"]
 
-# Y-axis label — explicit that λ is inactive and fitness = pure Sharpe
+# λ is inactive and fitness = pure Sharpe — explicit in axis label
 YAXIS_LABEL = "In-sample Sharpe  (prev_weights=None, λ inactive)"
 
 plt.rcParams.update({
-    "figure.dpi"       : 300,
-    "font.family"      : "serif",
-    "font.size"        : 11,
-    "axes.titlesize"   : 12,
-    "axes.labelsize"   : 11,
-    "legend.fontsize"  : 10,
-    "xtick.labelsize"  : 10,
-    "ytick.labelsize"  : 10,
-    "axes.spines.top"  : False,
+    "figure.dpi": 300,
+    "font.family": "serif",
+    "font.size": 11,
+    "axes.titlesize": 12,
+    "axes.labelsize": 11,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "axes.spines.top": False,
     "axes.spines.right": False,
-    "axes.grid"        : True,
-    "grid.alpha"       : 0.3,
-    "grid.linestyle"   : "--",
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "grid.linestyle": "--",
 })
 
 
-def run_convergence_for_config(mu:       np.ndarray,
-                               sigma:    np.ndarray,
-                               n_assets: int,
-                               params:   dict) -> tuple:
+def run_convergence_for_config(mu: np.ndarray, sigma: np.ndarray,
+                                n_assets: int, params: dict) -> tuple:
     """
     Temporarily overrides ga_module constants; restores after run regardless of exceptions.
     prev_weights=None: λ inactive, fitness = pure in-sample Sharpe.
     Returns (median_traj, q25, q75, generations, median_stop).
     """
-    orig_pc      = ga_module.PC
-    orig_pm      = ga_module.PM
+    orig_pc = ga_module.PC
+    orig_pm = ga_module.PM
     orig_sigma_m = ga_module.SIGMA_M
-    orig_lambda  = ga_module.LAMBDA
+    orig_lambda = ga_module.LAMBDA
 
-    ga_module.PC      = params["pc"]
-    ga_module.PM      = params["pm"]
+    ga_module.PC = params["pc"]
+    ga_module.PM = params["pm"]
     ga_module.SIGMA_M = params["sigma_m"]
-    ga_module.LAMBDA  = params["lambda_"]
+    ga_module.LAMBDA = params["lambda_"]
 
     try:
         all_histories = []
         for run_i in range(N_RUNS_CONV):
             rng = np.random.default_rng(BASE_SEED + run_i)
             _, history = run_ga(
-                n_assets       = n_assets,
-                mu             = mu,
-                sigma          = sigma,
-                prev_weights   = None,  # λ inactive — see module docstring
-                rng            = rng,
-                return_history = True,
+                n_assets=n_assets,
+                mu=mu,
+                sigma=sigma,
+                prev_weights=None,
+                rng=rng,
+                return_history=True,
             )
             all_histories.append(history)
 
     finally:
-        ga_module.PC      = orig_pc
-        ga_module.PM      = orig_pm
+        ga_module.PC = orig_pc
+        ga_module.PM = orig_pm
         ga_module.SIGMA_M = orig_sigma_m
-        ga_module.LAMBDA  = orig_lambda
+        ga_module.LAMBDA = orig_lambda
 
-    # Pad shorter runs with final value (early stopping → converged)
+    # pad shorter runs with final value (early stopping → converged)
     max_len = max(len(h) for h in all_histories)
-    padded  = np.array([
+    padded = np.array([
         h + [h[-1]] * (max_len - len(h))
         for h in all_histories
     ])
 
     median_traj = np.median(padded, axis=0)
-    q25         = np.percentile(padded, 25, axis=0)
-    q75         = np.percentile(padded, 75, axis=0)
+    q25 = np.percentile(padded, 25, axis=0)
+    q75 = np.percentile(padded, 75, axis=0)
     generations = np.arange(1, max_len + 1)
     median_stop = int(np.median([len(h) for h in all_histories]))
 
     return median_traj, q25, q75, generations, median_stop
 
 
-def plot_single_config(results:    dict,
-                       config_lbl: str,
-                       filename:   str) -> None:
+def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):
@@ -159,8 +153,7 @@ def plot_single_config(results:    dict,
 
 
 def plot_comparison(results: dict) -> None:
-    """
-    Primary figure: tuned vs default overlaid, one subplot per date.
+    """Primary figure: tuned vs default overlaid, one subplot per date.
     This is the key figure for RQ3 — isolates pc/pm/sigma_m effect.
     """
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
@@ -204,7 +197,7 @@ def run_convergence() -> None:
     universe, returns = load_data()
 
     results = {
-        TUNED_PARAMS["label"]  : {},
+        TUNED_PARAMS["label"]: {},
         DEFAULT_PARAMS["label"]: {},
     }
 

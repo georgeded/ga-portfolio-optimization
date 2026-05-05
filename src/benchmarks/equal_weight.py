@@ -19,13 +19,12 @@ from src.utils.portfolio import (
 )
 
 
-def run_equal_weight(universe: pd.DataFrame,
-                     returns:  pd.DataFrame,
-                     gamma:    float = TRANSACTION_COST) -> pd.DataFrame:
-    rebalance_dates  = sorted(universe["date"].unique())
+def run_equal_weight(universe: pd.DataFrame, returns: pd.DataFrame,
+                     gamma: float = TRANSACTION_COST) -> pd.DataFrame:
+    rebalance_dates = sorted(universe["date"].unique())
     all_return_dates = sorted(returns["date"].unique())
 
-    results      = []
+    results = []
     prev_weights = None
     prev_permnos = None
 
@@ -46,37 +45,37 @@ def run_equal_weight(universe: pd.DataFrame,
 
         weights = np.ones(N) / N
 
-        month_ret     = get_monthly_returns(returns, eligible, apply_date)
+        month_ret = get_monthly_returns(returns, eligible, apply_date)
         stock_returns = month_ret.values
 
-        portfolio_gross  = float(np.dot(weights, stock_returns))
-        rf               = get_rf_for_month(returns, apply_date)
+        portfolio_gross = float(np.dot(weights, stock_returns))
+        rf = get_rf_for_month(returns, apply_date)
         portfolio_excess = portfolio_gross - rf
 
         if prev_weights is not None and prev_permnos is not None:
-            prev_ret      = get_monthly_returns(returns, prev_permnos, apply_date)
-            drifted       = compute_drift_weights(prev_weights, prev_ret.values)
+            prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
+            drifted = compute_drift_weights(prev_weights, prev_ret.values)
             drifted_array = align_drifted_weights(drifted, prev_permnos, eligible)
-            turnover      = portfolio_turnover(weights, drifted_array)
+            turnover = portfolio_turnover(weights, drifted_array)
         else:
             turnover = 1.0
 
-        cost       = gamma * turnover
+        cost = gamma * turnover
         net_excess = portfolio_excess - cost
 
         results.append({
-            "date"          : apply_date,
-            "portfolio_ret" : portfolio_gross,
-            "excess_ret"    : portfolio_excess,
-            "rf"            : rf,
+            "date": apply_date,
+            "portfolio_ret": portfolio_gross,
+            "excess_ret": portfolio_excess,
+            "rf": rf,
             "net_excess_ret": net_excess,
-            "turnover"      : turnover,
-            "cost"          : cost,
-            "hhi"           : herfindahl_index(weights),
-            "n_stocks"      : N,
+            "turnover": turnover,
+            "cost": cost,
+            "hhi": herfindahl_index(weights),
+            "n_stocks": N,
         })
 
-        # Drift weights for next period's turnover calculation
+        # drift weights for next period's turnover calculation
         prev_weights = compute_drift_weights(weights, stock_returns)
         prev_permnos = eligible
 

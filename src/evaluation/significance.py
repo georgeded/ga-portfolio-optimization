@@ -12,17 +12,17 @@ import os
 
 OUT_DIR = "results/tables"
 
-COL_COMPARISON  = "Comparison"
-COL_MEAN_DIFF   = "Mean Diff (ann.)"
-COL_T_STAT      = "t-stat"
-COL_T_PVAL      = "t p-value"
-COL_T_SIG       = "t Sig."
-COL_SR_GA       = "SR(GA)"
-COL_SR_BENCH    = "SR(Bench)"
-COL_SR_DIFF     = "SR Diff"
-COL_Z_STAT      = "z-stat"
-COL_JK_PVAL     = "JK p-value"
-COL_JK_SIG      = "JK Sig."
+COL_COMPARISON = "Comparison"
+COL_MEAN_DIFF  = "Mean Diff (ann.)"
+COL_T_STAT     = "t-stat"
+COL_T_PVAL     = "t p-value"
+COL_T_SIG      = "t Sig."
+COL_SR_GA      = "SR(GA)"
+COL_SR_BENCH   = "SR(Bench)"
+COL_SR_DIFF    = "SR Diff"
+COL_Z_STAT     = "z-stat"
+COL_JK_PVAL    = "JK p-value"
+COL_JK_SIG     = "JK Sig."
 
 
 def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
@@ -34,8 +34,8 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     assert len(r2) == T, "Return series must have equal length"
 
     mu1, mu2 = r1.mean(), r2.mean()
-    s1,  s2  = r1.std(ddof=1), r2.std(ddof=1)
-    s12      = np.cov(r1, r2, ddof=1)[0, 1]
+    s1, s2 = r1.std(ddof=1), r2.std(ddof=1)
+    s12 = np.cov(r1, r2, ddof=1)[0, 1]
 
     if s1 <= 0 or s2 <= 0:
         return {
@@ -55,44 +55,44 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     )
 
     if var_diff <= 0:
-        z_stat  = 0.0
+        z_stat = 0.0
         p_value = 1.0
     else:
-        z_stat  = (sr1 - sr2) / np.sqrt(var_diff)
+        z_stat = (sr1 - sr2) / np.sqrt(var_diff)
         p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
     sqrt12 = np.sqrt(12)
     return {
-        "sr1_ann"    : sr1 * sqrt12,
-        "sr2_ann"    : sr2 * sqrt12,
+        "sr1_ann": sr1 * sqrt12,
+        "sr2_ann": sr2 * sqrt12,
         "sr_diff_ann": (sr1 - sr2) * sqrt12,
-        "z_stat"     : z_stat,
-        "p_value"    : p_value,
+        "z_stat": z_stat,
+        "p_value": p_value,
         "significant": p_value < 0.05,
     }
 
 
 def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
     """Paired t-test on monthly net excess return differences."""
-    diff            = r1 - r2
+    diff = r1 - r2
     t_stat, p_value = stats.ttest_1samp(diff, popmean=0)
     return {
         "mean_diff_ann": diff.mean() * 12,
-        "t_stat"       : t_stat,
-        "p_value"      : p_value,
-        "significant"  : p_value < 0.05,
+        "t_stat": t_stat,
+        "p_value": p_value,
+        "significant": p_value < 0.05,
     }
 
 
 def build_table2(
-    ga_path      : str = "results/ga/ga_results.parquet",
-    ew_path      : str = "results/benchmarks/equal_weight_full.parquet",
-    mvo_unc_path : str = "results/benchmarks/mvo_unconstrained.parquet",
-    mvo_con_path : str = "results/benchmarks/mvo_constrained.parquet",
+    ga_path: str = "results/ga/ga_results.parquet",
+    ew_path: str = "results/benchmarks/equal_weight_full.parquet",
+    mvo_unc_path: str = "results/benchmarks/mvo_unconstrained.parquet",
+    mvo_con_path: str = "results/benchmarks/mvo_constrained.parquet",
 ) -> tuple:
     """Run all significance tests. Returns (raw_df, fmt_df)."""
-    ga      = pd.read_parquet(ga_path)
-    ew      = pd.read_parquet(ew_path)
+    ga = pd.read_parquet(ga_path)
+    ew = pd.read_parquet(ew_path)
     mvo_unc = pd.read_parquet(mvo_unc_path)
     mvo_con = pd.read_parquet(mvo_con_path)
 
@@ -101,15 +101,15 @@ def build_table2(
     assert (mvo_unc["date"].values == dates).all(), "Date mismatch: GA vs Unc MVO"
     assert (mvo_con["date"].values == dates).all(), "Date mismatch: GA vs Con MVO"
 
-    r_ga      = ga["net_excess_ret"].values
-    r_ew      = ew["net_excess_ret"].values
+    r_ga = ga["net_excess_ret"].values
+    r_ew = ew["net_excess_ret"].values
     r_mvo_unc = mvo_unc["net_excess_ret"].values
     r_mvo_con = mvo_con["net_excess_ret"].values
 
     benchmarks = {
-        "GA vs 1/N"              : r_ew,
+        "GA vs 1/N":               r_ew,
         "GA vs Unconstrained MVO": r_mvo_unc,
-        "GA vs Constrained MVO"  : r_mvo_con,
+        "GA vs Constrained MVO":   r_mvo_con,
     }
 
     rows = []
@@ -117,17 +117,17 @@ def build_table2(
         tt = paired_ttest(r_ga, r_bench)
         jk = jobson_korkie_test(r_ga, r_bench)
         rows.append({
-            COL_COMPARISON : label,
-            COL_MEAN_DIFF  : tt["mean_diff_ann"],
-            COL_T_STAT     : tt["t_stat"],
-            COL_T_PVAL     : tt["p_value"],
-            COL_T_SIG      : tt["significant"],
-            COL_SR_GA      : jk["sr1_ann"],
-            COL_SR_BENCH   : jk["sr2_ann"],
-            COL_SR_DIFF    : jk["sr_diff_ann"],
-            COL_Z_STAT     : jk["z_stat"],
-            COL_JK_PVAL    : jk["p_value"],
-            COL_JK_SIG     : jk["significant"],
+            COL_COMPARISON: label,
+            COL_MEAN_DIFF:  tt["mean_diff_ann"],
+            COL_T_STAT:     tt["t_stat"],
+            COL_T_PVAL:     tt["p_value"],
+            COL_T_SIG:      tt["significant"],
+            COL_SR_GA:      jk["sr1_ann"],
+            COL_SR_BENCH:   jk["sr2_ann"],
+            COL_SR_DIFF:    jk["sr_diff_ann"],
+            COL_Z_STAT:     jk["z_stat"],
+            COL_JK_PVAL:    jk["p_value"],
+            COL_JK_SIG:     jk["significant"],
         })
 
     raw = pd.DataFrame(rows).set_index(COL_COMPARISON)
@@ -177,12 +177,12 @@ def to_png(fmt: pd.DataFrame, path: str) -> None:
     ax.axis("off")
 
     tbl = ax.table(
-        cellText  = display.values,
-        rowLabels = display.index.tolist(),
-        colLabels = display.columns.tolist(),
-        cellLoc   = "center",
-        rowLoc    = "left",
-        loc       = "center",
+        cellText=display.values,
+        rowLabels=display.index.tolist(),
+        colLabels=display.columns.tolist(),
+        cellLoc="center",
+        rowLoc="left",
+        loc="center",
     )
     tbl.auto_set_font_size(False)
     tbl.set_fontsize(9)

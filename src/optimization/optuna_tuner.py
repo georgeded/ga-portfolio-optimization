@@ -1,24 +1,14 @@
 """
 GA hyperparameter tuner (Optuna, TPE sampler).
 
-Tuning period : Jan 2005 – Dec 2012  (96 periods)
-Objective     : maximise net Sharpe on the tuning period
+Tuning period: Jan 2005 – Dec 2012 (96 periods).
+Objective: maximise net Sharpe on the tuning period.
+Parameters: PC ∈ [0.60, 0.95], PM ∈ [0.01, 0.30], SIGMA_M ∈ [0.01, 0.15], LAMBDA ∈ [0.00, 2.00].
 
-Parameters:
-    PC      ∈ [0.60, 0.95]   crossover probability
-    PM      ∈ [0.01, 0.30]   per-operator mutation probability
-    SIGMA_M ∈ [0.01, 0.15]   Gaussian mutation std
-    LAMBDA  ∈ [0.00, 2.00]   turnover penalty coefficient
-
-Usage
------
-Full (100 trials, 5 runs/period, 100 gens):
-    python3 -m src.optimization.optuna_tuner
-
-Debug (5 trials, 3 runs, 30 gens, 12 periods):
-    python3 -m src.optimization.optuna_tuner --debug
-
-Resume: SQLite storage auto-resumes.
+Usage:
+    python3 -m src.optimization.optuna_tuner          # full run (15 trials)
+    python3 -m src.optimization.optuna_tuner --debug  # 5 trials, 3 runs, 30 gens, 12 periods
+    Resume: SQLite storage auto-resumes.
 """
 
 import argparse
@@ -63,13 +53,7 @@ BEST_PARAMS = os.path.join(OUTPUT_DIR, "best_params.json")
 
 # module-level for pickling
 def _run_single(args: tuple) -> np.ndarray:
-    """
-    Run one GA instance with trial-specific hyperparameters.
-
-    Args:
-        args: (n_assets, mu, sigma, prev_weights, seed, n_gens,
-               pc, pm, sigma_m, lambda_)
-    """
+    """Run one GA instance with trial-specific hyperparameters."""
     n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_ = args
 
     ga_module.N_GENS  = n_gens
@@ -83,23 +67,21 @@ def _run_single(args: tuple) -> np.ndarray:
 
 
 def _eval_period(
-    t:            pd.Timestamp,
-    apply_date:   pd.Timestamp,
-    universe:     pd.DataFrame,
-    returns:      pd.DataFrame,
+    t: pd.Timestamp,
+    apply_date: pd.Timestamp,
+    universe: pd.DataFrame,
+    returns: pd.DataFrame,
     prev_weights: np.ndarray | None,
     prev_permnos: list | None,
-    n_runs:       int,
-    n_gens:       int,
-    params:       dict,
-    pool:         Pool,
-    gamma:        float,
+    n_runs: int,
+    n_gens: int,
+    params: dict,
+    pool: Pool,
+    gamma: float,
 ) -> tuple[dict | None, np.ndarray | None, list | None]:
-    """
-    Evaluate one period under given hyperparameters.
+    """Evaluate one period under given hyperparameters.
     Canonical = median in-sample fitness (mirrors runner.py). pw_aligned + lambda_ passed
     to ga_fitness so the turnover penalty matches what GA workers optimised against.
-    Returns (result_row, new_drifted_weights, new_permnos).
     """
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
@@ -112,8 +94,8 @@ def _eval_period(
     n_assets = len(valid_permnos)
 
     if prev_weights is not None and prev_permnos is not None:
-        prev_ret   = get_monthly_returns(returns, prev_permnos, apply_date)
-        drifted    = compute_drift_weights(prev_weights, prev_ret.values)
+        prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
+        drifted = compute_drift_weights(prev_weights, prev_ret.values)
         pw_aligned = align_drifted_weights(drifted, prev_permnos, valid_permnos)
     else:
         pw_aligned = None
@@ -126,12 +108,12 @@ def _eval_period(
     ]
     all_weights: list[np.ndarray] = pool.map(_run_single, worker_args)
 
-    month_ret  = get_monthly_returns(returns, valid_permnos, apply_date)
+    month_ret = get_monthly_returns(returns, valid_permnos, apply_date)
     stock_rets = month_ret.values
-    rf         = get_rf_for_month(returns, apply_date)
+    rf = get_rf_for_month(returns, apply_date)
 
     gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
-    median_ret    = float(np.median(gross_returns))
+    median_ret = float(np.median(gross_returns))
 
     # pw_aligned + lambda_ passed so penalty matches what run_ga optimised (critical for LAMBDA tuning)
     in_sample_fitnesses = np.array([
@@ -139,8 +121,8 @@ def _eval_period(
         for w in all_weights
     ])
     median_fitness = float(np.median(in_sample_fitnesses))
-    canonical_i    = int(np.argmin(np.abs(in_sample_fitnesses - median_fitness)))
-    canon_w        = all_weights[canonical_i]
+    canonical_i = int(np.argmin(np.abs(in_sample_fitnesses - median_fitness)))
+    canon_w = all_weights[canonical_i]
 
     portfolio_excess = median_ret - rf
     turnover = (
@@ -151,9 +133,9 @@ def _eval_period(
 
     result = {
         "excess_ret": portfolio_excess,
-        "rf"        : rf,
-        "turnover"  : turnover,
-        "cost"      : cost,
+        "rf": rf,
+        "turnover": turnover,
+        "cost": cost,
     }
 
     new_weights = compute_drift_weights(canon_w, stock_rets)
@@ -161,14 +143,14 @@ def _eval_period(
 
 
 def _make_objective(
-    universe:         pd.DataFrame,
-    returns:          pd.DataFrame,
-    tuning_dates:     list,
+    universe: pd.DataFrame,
+    returns: pd.DataFrame,
+    tuning_dates: list,
     all_return_dates: list,
-    n_runs:           int,
-    n_gens:           int,
-    n_workers:        int,
-    gamma:            float,
+    n_runs: int,
+    n_gens: int,
+    n_workers: int,
+    gamma: float,
 ):
     """Pool created once per trial to avoid 96 spawn/kill cycles."""
     def objective(trial: optuna.Trial) -> float:
@@ -178,16 +160,13 @@ def _make_objective(
         lambda_ = trial.suggest_float("lambda_", 0.00, 2.00)
 
         trial_params = {
-            "pc"      : pc,
-            "pm"      : pm,
-            "sigma_m" : sigma_m,
-            "lambda_" : lambda_,
+            "pc": pc, "pm": pm, "sigma_m": sigma_m, "lambda_": lambda_,
         }
 
-        excess_rets   = []
+        excess_rets = []
         turnovers_arr = []
-        prev_weights  = None
-        prev_permnos  = None
+        prev_weights = None
+        prev_permnos = None
 
         with mp.Pool(processes=n_workers) as pool:
             for t in tuning_dates:
@@ -215,7 +194,7 @@ def _make_objective(
             raise optuna.exceptions.TrialPruned()
 
         excess_arr = np.array(excess_rets)
-        costs      = np.array(turnovers_arr) * gamma
+        costs = np.array(turnovers_arr) * gamma
         net_excess = excess_arr - costs
 
         return sharpe_ratio(net_excess)
@@ -224,18 +203,18 @@ def _make_objective(
 
 
 def run_tuner(
-    n_trials:    int        = N_TRIALS,
-    n_runs:      int        = N_RUNS_TUNE,
-    n_gens:      int        = N_GENS_TUNE,
+    n_trials: int = N_TRIALS,
+    n_runs: int = N_RUNS_TUNE,
+    n_gens: int = N_GENS_TUNE,
     max_periods: int | None = None,
-    gamma:       float      = TRANSACTION_COST,
+    gamma: float = TRANSACTION_COST,
 ) -> dict:
     """Run Optuna search and return best hyperparameter dict."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     universe, returns = load_data()
 
-    all_dates        = sorted(universe["date"].unique())
+    all_dates = sorted(universe["date"].unique())
     all_return_dates = sorted(returns["date"].unique())
 
     tuning_dates = [
@@ -257,15 +236,15 @@ def run_tuner(
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     study = optuna.create_study(
-        study_name     = "ga_hyperparameter_tuning",
-        direction      = "maximize",
-        storage        = f"sqlite:///{STUDY_DB}",
-        load_if_exists = True,
-        sampler        = optuna.samplers.TPESampler(seed=42),
+        study_name="ga_hyperparameter_tuning",
+        direction="maximize",
+        storage=f"sqlite:///{STUDY_DB}",
+        load_if_exists=True,
+        sampler=optuna.samplers.TPESampler(seed=42),
     )
 
     already_done = len(study.trials)
-    remaining    = n_trials - already_done
+    remaining = n_trials - already_done
 
     if remaining <= 0:
         print(f"Study already has {already_done} trials — nothing to do.")
@@ -294,7 +273,7 @@ def run_tuner(
         print(f"\nTuning complete in {(time.time()-t0)/60:.1f} min")
 
     best_params = study.best_params
-    best_value  = study.best_value
+    best_value = study.best_value
 
     print("\n" + "=" * 50)
     print("BEST HYPERPARAMETERS")
@@ -307,16 +286,16 @@ def run_tuner(
     print("=" * 50)
 
     output = {
-        "best_net_sharpe_tuning" : round(best_value, 6),
-        "pc"                     : round(best_params["pc"],      4),
-        "pm"                     : round(best_params["pm"],      4),
-        "sigma_m"                : round(best_params["sigma_m"], 4),
-        "lambda_"                : round(best_params["lambda_"], 4),
-        "tuning_period_start"    : TUNE_START,
-        "tuning_period_end"      : TUNE_END,
-        "n_trials"               : len(study.trials),
-        "n_runs_per_trial"       : n_runs,
-        "n_gens_per_trial"       : n_gens,
+        "best_net_sharpe_tuning": round(best_value, 6),
+        "pc":                     round(best_params["pc"],      4),
+        "pm":                     round(best_params["pm"],      4),
+        "sigma_m":                round(best_params["sigma_m"], 4),
+        "lambda_":                round(best_params["lambda_"], 4),
+        "tuning_period_start":    TUNE_START,
+        "tuning_period_end":      TUNE_END,
+        "n_trials":               len(study.trials),
+        "n_runs_per_trial":       n_runs,
+        "n_gens_per_trial":       n_gens,
     }
     with open(BEST_PARAMS, "w") as f:
         json.dump(output, f, indent=2)
@@ -351,9 +330,9 @@ if __name__ == "__main__":
         run_tuner(n_trials=5, n_runs=3, n_gens=30, max_periods=12, gamma=args.gamma)
     else:
         run_tuner(
-            n_trials    = args.n_trials,
-            n_runs      = args.n_runs,
-            n_gens      = args.n_gens,
-            max_periods = args.max_periods,
-            gamma       = args.gamma,
+            n_trials=args.n_trials,
+            n_runs=args.n_runs,
+            n_gens=args.n_gens,
+            max_periods=args.max_periods,
+            gamma=args.gamma,
         )

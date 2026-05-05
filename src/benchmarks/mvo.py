@@ -1,11 +1,10 @@
 """
 Mean-variance optimization — two variants:
 
-(a) Unconstrained MVO: maximize Sharpe, long-only bounds [0, 1], no cardinality constraint.
-(b) Constrained MVO:   maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
-    (QP cannot handle cardinality, so no K constraint here.)
+(a) Unconstrained MVO: maximize Sharpe, long-only [0, 1], no cardinality constraint.
+(b) Constrained MVO: maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
 
-Both use the same 60-month estimation window, full universe (~867 stocks), and γ = 0.3%.
+Both use the 60-month estimation window, full universe (~867 stocks), γ = 0.3%.
 """
 
 import numpy as np
@@ -32,37 +31,31 @@ from src.utils.portfolio import (
 
 W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
-W_MIN_CONSTRAINED   = 0.0
-W_MAX_CONSTRAINED   = 0.15
+W_MIN_CONSTRAINED = 0.0
+W_MAX_CONSTRAINED = 0.15
 
 
-def negative_sharpe(weights: np.ndarray,
-                    mu:      np.ndarray,
-                    sigma:   np.ndarray) -> float:
-    """Objective: negative Sharpe ratio (minimized by scipy SLSQP)."""
+def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
+    """Objective minimized by scipy SLSQP."""
     port_return = float(weights @ mu)
-    port_var    = float(weights @ sigma @ weights)
+    port_var = float(weights @ sigma @ weights)
     if port_var <= 0:
         return 0.0
     return -port_return / np.sqrt(port_var)
 
 
-def optimize_mvo(mu:         np.ndarray,
-                 sigma:      np.ndarray,
-                 w_min:      float,
-                 w_max:      float,
-                 n_restarts: int = 1,
-                 rng:        np.random.Generator = None) -> np.ndarray:
+def optimize_mvo(mu: np.ndarray, sigma: np.ndarray, w_min: float, w_max: float,
+                 n_restarts: int = 1, rng: np.random.Generator = None) -> np.ndarray:
     """Maximize Sharpe (SLSQP, n_restarts random starts). Falls back to equal weights on failure."""
     if rng is None:
         rng = np.random.default_rng(seed=42)
 
-    N           = len(mu)
+    N = len(mu)
     constraints = [{"type": "eq", "fun": lambda w: np.sum(w) - 1.0}]
-    bounds      = [(w_min, w_max)] * N
+    bounds = [(w_min, w_max)] * N
 
     best_weights = None
-    best_sharpe  = -np.inf
+    best_sharpe = -np.inf
 
     for _ in range(n_restarts):
         w0 = rng.dirichlet(np.ones(N))
@@ -80,7 +73,7 @@ def optimize_mvo(mu:         np.ndarray,
                 options={"maxiter": 200, "ftol": 1e-6}
             )
             if result.success and (-result.fun) > best_sharpe:
-                best_sharpe  = -result.fun
+                best_sharpe = -result.fun
                 best_weights = result.x
         except Exception:
             continue
@@ -93,16 +86,8 @@ def optimize_mvo(mu:         np.ndarray,
     return best_weights
 
 
-def _process_single_period(t:            pd.Timestamp,
-                            apply_date:   pd.Timestamp,
-                            universe:     pd.DataFrame,
-                            returns:      pd.DataFrame,
-                            w_min:        float,
-                            w_max:        float,
-                            gamma:        float,
-                            prev_weights: np.ndarray,
-                            prev_permnos: list,
-                            rng:          np.random.Generator) -> tuple:
+def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma,
+                           prev_weights, prev_permnos, rng) -> tuple:
     """Process one rebalancing period. Returns (result_dict, new_weights, new_permnos)."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
@@ -114,57 +99,53 @@ def _process_single_period(t:            pd.Timestamp,
 
     weights = optimize_mvo(mu, sigma, w_min, w_max, rng=rng)
 
-    month_ret     = get_monthly_returns(returns, valid_permnos, apply_date)
+    month_ret = get_monthly_returns(returns, valid_permnos, apply_date)
     stock_returns = month_ret.values
-    rf            = get_rf_for_month(returns, apply_date)
+    rf = get_rf_for_month(returns, apply_date)
 
-    portfolio_gross  = float(np.dot(weights, stock_returns))
+    portfolio_gross = float(np.dot(weights, stock_returns))
     portfolio_excess = portfolio_gross - rf
 
     if prev_weights is not None and prev_permnos is not None:
-        prev_ret      = get_monthly_returns(returns, prev_permnos, apply_date)
-        drifted       = compute_drift_weights(prev_weights, prev_ret.values)
+        prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
+        drifted = compute_drift_weights(prev_weights, prev_ret.values)
         drifted_array = align_drifted_weights(drifted, prev_permnos, valid_permnos)
-        to            = portfolio_turnover(weights, drifted_array)
+        to = portfolio_turnover(weights, drifted_array)
     else:
         to = 1.0
 
-    cost       = transaction_cost(to, gamma)
+    cost = transaction_cost(to, gamma)
     net_excess = portfolio_excess - cost
 
     result = {
-        "date"          : apply_date,
-        "n_stocks"      : len(valid_permnos),
-        "portfolio_ret" : portfolio_gross,
-        "excess_ret"    : portfolio_excess,
-        "rf"            : rf,
+        "date": apply_date,
+        "n_stocks": len(valid_permnos),
+        "portfolio_ret": portfolio_gross,
+        "excess_ret": portfolio_excess,
+        "rf": rf,
         "net_excess_ret": net_excess,
-        "turnover"      : to,
-        "cost"          : cost,
-        "hhi"           : herfindahl_index(weights),
+        "turnover": to,
+        "cost": cost,
+        "hhi": herfindahl_index(weights),
     }
 
     return result, compute_drift_weights(weights, stock_returns), valid_permnos
 
 
-def run_mvo(universe:    pd.DataFrame,
-            returns:     pd.DataFrame,
-            constrained: bool  = False,
-            gamma:       float = TRANSACTION_COST,
-            seed:        int   = 42) -> pd.DataFrame:
-    """
-    Run MVO over all rebalancing dates.
+def run_mvo(universe: pd.DataFrame, returns: pd.DataFrame, constrained: bool = False,
+            gamma: float = TRANSACTION_COST, seed: int = 42) -> pd.DataFrame:
+    """Run MVO over all rebalancing dates.
     constrained=True uses bounds [0, 0.15]; False uses [0, 1.0].
     """
-    rng   = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed)
     w_min = W_MIN_CONSTRAINED if constrained else W_MIN_UNCONSTRAINED
     w_max = W_MAX_CONSTRAINED if constrained else W_MAX_UNCONSTRAINED
     label = "Constrained MVO" if constrained else "Unconstrained MVO"
 
-    rebalance_dates  = sorted(universe["date"].unique())
+    rebalance_dates = sorted(universe["date"].unique())
     all_return_dates = sorted(returns["date"].unique())
 
-    results      = []
+    results = []
     prev_weights = None
     prev_permnos = None
 

@@ -32,9 +32,7 @@ def load_rf(path: str = "data/processed/risk_free_rate.parquet") -> pd.DataFrame
     return df
 
 
-def compute_excess_returns(universe:  pd.DataFrame,
-                           crsp:      pd.DataFrame,
-                           rf:        pd.DataFrame) -> pd.DataFrame:
+def compute_excess_returns(universe: pd.DataFrame, crsp: pd.DataFrame, rf: pd.DataFrame) -> pd.DataFrame:
     """
     CRSP dates are end-of-month (e.g. 2005-01-31); FRED dates are start-of-month.
     Matched on year-month period — same calendar month, different day convention.
@@ -85,8 +83,8 @@ def validate_excess_returns(df: pd.DataFrame) -> None:
 
 if __name__ == "__main__":
     universe = load_universe()
-    crsp     = load_crsp()
-    rf       = load_rf()
+    crsp = load_crsp()
+    rf = load_rf()
 
     print("\nComputing excess returns...")
     df = compute_excess_returns(universe, crsp, rf)

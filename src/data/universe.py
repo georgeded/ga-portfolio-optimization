@@ -1,20 +1,17 @@
 """
 Universe construction: eligible stocks at each rebalancing date.
 
-Filters:
-- NYSE and NASDAQ only (primaryexch IN ('N', 'Q'))
-- Common stocks only (ShareType/SecuritySubType/IssuerType combination)
-- Market cap ≥ $2B (|PRC| × SHROUT, lagged 1 month)
-- Exactly 60 non-missing returns in the 60-month estimation window
+Filters: NYSE/NASDAQ only, common stocks (CIZ equivalents of shrcd IN (10,11)),
+market cap ≥ $2B (lagged 1 month), exactly 60 non-missing returns in the 60-month window.
 """
 
 import pandas as pd
 import numpy as np
 import os
 
-MIN_MARKET_CAP_B  = 2.0    # billion USD
-ESTIMATION_WINDOW = 60     # months
-SHROUT_SCALE      = 1_000  # CRSP ShrOut is in thousands of shares
+MIN_MARKET_CAP_B = 2.0    # billion USD
+ESTIMATION_WINDOW = 60    # months
+SHROUT_SCALE = 1_000       # CRSP ShrOut is in thousands of shares
 
 
 def load_raw_crsp(path: str = "data/raw/crsp_returns.parquet") -> pd.DataFrame:
@@ -52,10 +49,10 @@ def filter_basic(df: pd.DataFrame) -> pd.DataFrame:
 
     before = len(df)
     df = df[
-        (df["sharetype"]       == "NS")   &
-        (df["securitytype"]    == "EQTY") &
-        (df["securitysubtype"] == "COM")  &
-        (df["usincflg"]        == "Y")    &
+        (df["sharetype"] == "NS") &
+        (df["securitytype"] == "EQTY") &
+        (df["securitysubtype"] == "COM") &
+        (df["usincflg"] == "Y") &
         (df["issuertype"].isin(["CORP", "ACOR"]))
     ]
     print(f"After share class filter (common stocks): {len(df):,} rows "
@@ -64,8 +61,7 @@ def filter_basic(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_monthly_universe(df: pd.DataFrame,
-                           rebalance_date: pd.Timestamp) -> pd.Index:
+def build_monthly_universe(df: pd.DataFrame, rebalance_date: pd.Timestamp) -> pd.Index:
     """
     1. Market cap ≥ $2B at t-1 (last available obs before t; robust to end-of-month gaps)
     2. Exactly 60 non-missing returns in [t-60, t-1]
@@ -74,7 +70,7 @@ def build_monthly_universe(df: pd.DataFrame,
     """
     # CRSP dates are end-of-month; subtract 1 day so end-of-month dates
     # fall inside the window (e.g. Dec 31 is included for Jan 1 rebalance)
-    window_end   = rebalance_date - pd.DateOffset(days=1)
+    window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
 
     window_data = df[
@@ -106,9 +102,8 @@ def build_monthly_universe(df: pd.DataFrame,
     return pd.Index(eligible)
 
 
-def build_full_universe(df: pd.DataFrame,
-                        start_date: str = "2005-01-01",
-                        end_date:   str = "2025-12-01") -> dict:
+def build_full_universe(df: pd.DataFrame, start_date: str = "2005-01-01",
+                        end_date: str = "2025-12-01") -> dict:
     """
     Returns {pd.Timestamp -> list of PERMNOs} for each monthly date.
     Data from 2000 + 60-month burn-in → first usable date is 2005-01-01.

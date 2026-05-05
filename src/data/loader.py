@@ -1,12 +1,10 @@
 """
 Load raw CRSP monthly data (CIZ format) from WRDS and save as parquet.
-
-WRDS source: CRSP Annual Update → Stock Version 2 (CIZ) → Monthly Stock File
-Date range: 2000-01-01 to 2025-12-31
+WRDS source: CRSP Annual Update → Stock Version 2 (CIZ) → Monthly Stock File.
+Date range: 2000-01-01 to 2025-12-31.
 """
 
 import pandas as pd
-import numpy as np
 import os
 
 
@@ -14,9 +12,8 @@ def load_crsp_csv(path: str = "data/raw/crsp_returns.csv") -> pd.DataFrame:
     """Load raw CRSP CSV from WRDS; standardise column names and deduplicate."""
     print(f"Loading CRSP data from {path}...")
 
-    # parse_dates uses original column name (before lowercase conversion)
+    # parse_dates uses the original column name before the lowercase conversion below
     df = pd.read_csv(path, parse_dates=["MthCalDt"], low_memory=False)
-
     df.columns = df.columns.str.lower()
 
     # Deduplicate before rename (WRDS warning: rare duplicates from
@@ -28,13 +25,13 @@ def load_crsp_csv(path: str = "data/raw/crsp_returns.csv") -> pd.DataFrame:
         print(f"Removed {removed:,} duplicate rows (multiple distributions)")
 
     df = df.rename(columns={
-        "mthcaldt"       : "date",
-        "mthret"         : "ret",
-        "mthretx"        : "retx",
-        "mthprc"         : "prc",
-        "primaryexch"    : "exchcd",
-        "secinfostartdt" : "start_dt",
-        "secinfoenddt"   : "end_dt",
+        "mthcaldt": "date",
+        "mthret": "ret",
+        "mthretx": "retx",
+        "mthprc": "prc",
+        "primaryexch": "exchcd",
+        "secinfostartdt": "start_dt",
+        "secinfoenddt": "end_dt",
     })
 
     print(f"Loaded {len(df):,} rows, "

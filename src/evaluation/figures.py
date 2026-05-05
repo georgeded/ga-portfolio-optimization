@@ -1,5 +1,5 @@
 """
-Generates F1–F5: cumulative returns, rolling Sharpe, turnover, HHI, and GA cardinality.
+Generates F1-F5: cumulative returns, rolling Sharpe, turnover, HHI, and GA cardinality.
 Greyscale-compatible (readable in B&W print). Legends below figure to avoid obscuring data.
 """
 

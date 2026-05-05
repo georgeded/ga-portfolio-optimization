@@ -1,6 +1,5 @@
 """
 Genetic Algorithm for cardinality-constrained portfolio optimization.
-
 Chromosome: real-valued weight vector of length N (universe size).
 Exactly K entries are non-zero, with w_i ∈ [W_MIN, W_MAX] summing to 1.
 """

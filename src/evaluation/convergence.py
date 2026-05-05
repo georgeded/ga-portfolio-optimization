@@ -1,6 +1,5 @@
 """
-Figure A1 — GA Convergence (Tuned vs Default Parameters).
-
+Figure A1 - GA Convergence (Tuned vs Default Parameters).
 Three dates: Jan 2007 (pre-crisis), Jan 2010 (post-crisis), Jan 2020 (recent).
 N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, λ inactive).
 Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png.

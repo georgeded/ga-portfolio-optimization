@@ -1,10 +1,9 @@
 """
-Mean-variance optimization — two variants:
+Mean-variance optimization - two variants:
+- Unconstrained MVO: maximize Sharpe, long-only [0, 1], no cardinality constraint.
+- Constrained MVO: maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
 
-(a) Unconstrained MVO: maximize Sharpe, long-only [0, 1], no cardinality constraint.
-(b) Constrained MVO: maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
-
-Both use the 60-month estimation window, full universe (~867 stocks), γ = 0.3%.
+Both use the 60-month estimation window, full universe (approx. 867 stocks), gamma = 0.3%.
 """
 
 import numpy as np

@@ -1,16 +1,15 @@
 """
-Out-of-sample GA experiment runner (252 monthly periods, Jan 2005 – Dec 2025).
+Out-of-sample GA experiment runner (252 monthly periods, Jan 2005 - Dec 2025).
 
-Each period: build mu/sigma from 60-month window → run N_RUNS parallel GA instances
-→ report median realised gross return → use weights of the median-fitness run as the
+Each period: build mu/sigma from 60-month window -> run N_RUNS parallel GA instances
+-> report median realised gross return -> use weights of the median-fitness run as the
 canonical portfolio for drift/turnover/prev_weights in the next period.
 Checkpoints after every period so cloud jobs can resume safely.
 
-Usage:
-    python3 -m src.optimization.runner                          # full run
-    python3 -m src.optimization.runner --debug                  # 3 runs, 50 gens, 10 periods
-    python3 -m src.optimization.runner --clear-checkpoint       # restart from scratch
-    python3 -m src.optimization.runner --n-runs 5 --n-gens 100 --max-periods 20
+python3 -m src.optimization.runner (full run)
+python3 -m src.optimization.runner --debug (3 runs, 50 gens, 10 periods)
+python3 -m src.optimization.runner --clear-checkpoint (restart from scratch)
+python3 -m src.optimization.runner --n-runs 5 --n-gens 100 --max-periods 20
 """
 
 import argparse

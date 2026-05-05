@@ -1,6 +1,5 @@
 """
 Unit tests for src/optimization/genetic_algorithm.py.
-
 Covers: project_bounded_simplex, repair, initialize_population,
 fitness, tournament_select, crossover, mutate, local_refine, run_ga.
 

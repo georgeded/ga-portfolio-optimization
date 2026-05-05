@@ -1,14 +1,12 @@
 """
 GA hyperparameter tuner (Optuna, TPE sampler).
-
-Tuning period: Jan 2005 – Dec 2012 (96 periods).
+Tuning period: Jan 2005 - Dec 2012 (96 periods).
 Objective: maximise net Sharpe on the tuning period.
-Parameters: PC ∈ [0.60, 0.95], PM ∈ [0.01, 0.30], SIGMA_M ∈ [0.01, 0.15], LAMBDA ∈ [0.00, 2.00].
+Parameters: PC -> [0.60, 0.95], PM -> [0.01, 0.30], SIGMA_M -> [0.01, 0.15], LAMBDA -> [0.00, 2.00].
 
-Usage:
-    python3 -m src.optimization.optuna_tuner          # full run (15 trials)
-    python3 -m src.optimization.optuna_tuner --debug  # 5 trials, 3 runs, 30 gens, 12 periods
-    Resume: SQLite storage auto-resumes.
+python3 -m src.optimization.optuna_tuner (15 trials)
+python3 -m src.optimization.optuna_tuner --debug  5 trials, 3 runs, 30 gens, 12 periods
+Resume: SQLite storage auto-resumes.
 """
 
 import argparse

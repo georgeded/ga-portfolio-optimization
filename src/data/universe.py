@@ -1,6 +1,5 @@
 """
 Universe construction: eligible stocks at each rebalancing date.
-
 Filters: NYSE/NASDAQ only, common stocks (CIZ equivalents of shrcd IN (10,11)),
 market cap ≥ $2B (lagged 1 month), exactly 60 non-missing returns in the 60-month window.
 """

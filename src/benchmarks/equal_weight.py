@@ -1,4 +1,4 @@
-"""Naive equal-weight (1/N) benchmark. Rebalanced monthly; weights drift between periods."""
+"""Naive equal-weight (1/N) benchmark. Rebalanced monthly weights drift between periods."""
 
 import numpy as np
 import pandas as pd

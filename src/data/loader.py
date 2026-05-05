@@ -1,6 +1,6 @@
 """
 Load raw CRSP monthly data (CIZ format) from WRDS and save as parquet.
-WRDS source: CRSP Annual Update → Stock Version 2 (CIZ) → Monthly Stock File.
+WRDS source: CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File.
 Date range: 2000-01-01 to 2025-12-31.
 """
 

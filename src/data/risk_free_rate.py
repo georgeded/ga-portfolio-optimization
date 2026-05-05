@@ -1,4 +1,4 @@
-# Source: FRED DTB3 — 3-Month Treasury Bill, Monthly Average
+# Source: FRED DTB3 - 3-Month Treasury Bill, Monthly Average
 import pandas as pd
 
 def load_risk_free_rate(path: str = "data/raw/risk_free_rate.csv") -> pd.DataFrame:

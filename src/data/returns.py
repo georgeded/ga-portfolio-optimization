@@ -1,5 +1,5 @@
 """
-Merges CRSP returns with rf to compute monthly excess returns (MthRet − rf).
+Merges CRSP returns with rf to compute monthly excess returns (MthRet - rf).
 Output used by GA, MVO, 1/N, and evaluation modules.
 """
 

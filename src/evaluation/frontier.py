@@ -1,9 +1,8 @@
 """
-Figure 6 — Mean-Variance Efficient Frontier at representative dates.
-
+Figure 6 - Mean-Variance Efficient Frontier at representative dates.
 For each of 3 dates, traces the frontier and overlays actual GA, MVO, and 1/N positions.
 GA uses N_GENS_FRONTIER=50 (illustrative only; main experiment used 200).
-All positions use in-sample μ/Σ — not out-of-sample performance.
+All positions use in-sample μ/Σ - not out-of-sample performance.
 """
 
 import numpy as np

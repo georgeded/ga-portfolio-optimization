@@ -1,5 +1,5 @@
 """
-Monthly returns throughout. Annualization: returns × 12, vol × √12, Sharpe = ann. excess / ann. vol.
+Monthly returns throughout. Annualization: returns x 12, vol x sqrt(12), Sharpe = ann. excess / ann. vol.
 """
 
 import pandas as pd

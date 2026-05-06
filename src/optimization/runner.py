@@ -305,4 +305,4 @@ if __name__ == "__main__":
         )
 
     if len(results) > 0:
-        print_results(results, "GA (MEDIAN 30 RUNS)")
+        print_results(results, f"GA (MEDIAN {n_runs} RUNS)")

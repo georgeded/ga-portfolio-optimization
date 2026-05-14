@@ -17,7 +17,7 @@ Genetic algorithm for cardinality-constrained portfolio optimization on US equit
 | Unconstrained MVO | 0.5592 | **7.60%** | 13.60% | -38.68% | 24.14% |
 | 1/N (~867 stocks) | 0.5237 | **9.10%** | 17.38% | -52.19% | 5.85% |
 
-GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05). Evaluation period: January 2005 - December 2025, 252 monthly rebalancing periods, transaction cost γ = 0.3%.
+GA outperforms all three benchmarks (JK test, p < 0.05). Evaluation: Jan 2005 – Dec 2025, 252 monthly periods, γ = 0.3%.
 
 ---
 
@@ -25,7 +25,7 @@ GA statistically outperforms all three benchmarks (Jobson-Korkie test, α = 0.05
 
 Mean-variance optimization breaks down when the estimation window is short relative to the number of assets - with T=60 months and N≈867 stocks, the sample covariance matrix is nearly singular. The central question here is whether an evolutionary algorithm that directly constrains portfolio size, weight concentration, and turnover can produce better out-of-sample results than MVO and naive diversification.
 
-The GA selects K ∈ [10, 30] stocks each period and optimises a Sharpe-minus-turnover fitness function with Optuna-tuned parameters, evaluated over 20 years of rolling monthly returns. On the same universe and cost model as the benchmarks, it achieves a net Sharpe of 0.8751 - 0.28 points above the next-best benchmark, significant at α = 0.05.
+The GA selects K ∈ [10, 30] stocks each period and optimises a Sharpe-minus-turnover fitness function with Optuna-tuned parameters, evaluated over 20 years of rolling monthly returns. On the same universe and cost model as the benchmarks, it achieves a net Sharpe of 0.8751 — 0.32 points above the next-best benchmark (p < 0.05).
 
 ---
 

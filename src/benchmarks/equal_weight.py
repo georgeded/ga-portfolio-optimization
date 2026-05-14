@@ -75,7 +75,6 @@ def run_equal_weight(universe: pd.DataFrame, returns: pd.DataFrame,
             "n_stocks": N,
         })
 
-        # drift weights for next period's turnover calculation
         prev_weights = compute_drift_weights(weights, stock_returns)
         prev_permnos = eligible
 

@@ -6,7 +6,6 @@ def load_risk_free_rate(path: str = "data/raw/risk_free_rate.csv") -> pd.DataFra
     df = pd.read_csv(path, parse_dates=["observation_date"])
     df = df.rename(columns={"observation_date": "date", "DTB3": "rf_annual_pct"})
 
-    # (annual_rate / 100) / 12 → monthly decimal
     df["rf"] = (df["rf_annual_pct"] / 100) / 12
 
     df = df[["date", "rf"]].copy()

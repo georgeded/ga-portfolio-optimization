@@ -27,7 +27,6 @@ plt.rcParams.update({
     "grid.linestyle": "--",
 })
 
-# greyscale-compatible line styles (readable in B&W print)
 STYLES = {
     "GA":                {"color": "#000000", "lw": 2.0, "ls": "-"},
     "Unconstrained MVO": {"color": "#444444", "lw": 1.5, "ls": "--"},
@@ -330,4 +329,4 @@ if __name__ == "__main__":
     plot_hhi(data)
     plot_cardinality(data)
 
-    print("\nAll figures saved successfully.")
+    print("\nAll figures saved.")

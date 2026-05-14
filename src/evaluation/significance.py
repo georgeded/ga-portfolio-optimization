@@ -1,7 +1,7 @@
 """
 Significance tests comparing GA vs benchmarks:
-  1. Paired t-test: H0: mean return difference = 0
-  2. Jobson-Korkie (Memmel correction): H0: Sharpe difference = 0
+  - Paired t-test: H0: mean return difference = 0
+  - Jobson-Korkie (Memmel correction): H0: Sharpe difference = 0
 """
 
 import numpy as np

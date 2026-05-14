@@ -152,9 +152,7 @@ def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
 
 
 def plot_comparison(results: dict) -> None:
-    """Primary figure: tuned vs default overlaid, one subplot per date.
-    This is the key figure for RQ3 — isolates pc/pm/sigma_m effect.
-    """
+    """Tuned vs default overlaid, one subplot per date."""
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
 
     for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):

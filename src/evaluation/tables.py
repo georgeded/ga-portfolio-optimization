@@ -182,10 +182,9 @@ def to_latex_t1(fmt: pd.DataFrame) -> str:
 
 def compute_table3_metrics(df: pd.DataFrame) -> dict:
     """
-    Compute portfolio characteristics for Table 3 (RQ3).
-    Avg K: for MVO and 1/N this equals the eligible universe size (~867)
-    and is not a design parameter. For GA, K reflects adaptive cardinality
-    selection subject to the constraint K ∈ [10, 30].
+    Compute portfolio characteristics for Table 3.
+    Avg K: for MVO and 1/N this is the eligible universe size (~867).
+    For the GA, K is chosen adaptively within [10, 30].
     """
     return {
         COL_K:     float(df["n_stocks"].mean()),

@@ -110,7 +110,6 @@ def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.
         w[~mask] = 0.0
         return repair(w, rng, depth+1)
 
-    # zero out tiny numerical noise
     w[w <= 1e-10] = 0.0
     selected = w > 1e-10
 
@@ -136,7 +135,6 @@ def initialize_population(n_assets: int, rng: np.random.Generator) -> np.ndarray
         K = rng.integers(K_MIN, K_MAX + 1)
         selected = rng.choice(n_assets, size=K, replace=False)
 
-        # Dirichlet gives uniform distribution over the weight simplex
         raw_weights = rng.dirichlet(np.ones(K))
 
         w = np.zeros(n_assets)
@@ -218,7 +216,7 @@ def crossover(p1: np.ndarray, p2: np.ndarray, rng: np.random.Generator,
               pc: float = PC) -> tuple[np.ndarray, np.ndarray]:
     """
     Fires with probability pc; returns parent copies otherwise.
-    Two children per event (parent roles swapped) to extract more information per tournament pair.
+    Two children per call — parent roles are swapped for the second.
     """
     if rng.random() > pc:
         return p1.copy(), p2.copy()
@@ -322,7 +320,6 @@ def run_ga(n_assets: int, mu: np.ndarray, sigma: np.ndarray,
 
     for _ in range(N_GENS):
 
-        # sorted ascending — last entry is the best
         elite_idx = np.argsort(fitnesses)[-n_elite:]
         elites = population[elite_idx].copy()
         elite_fit = fitnesses[elite_idx].copy()
@@ -332,7 +329,6 @@ def run_ga(n_assets: int, mu: np.ndarray, sigma: np.ndarray,
             elites[-1], mu, sigma, prev_weights, rng
         )
 
-        # elites occupy slots 0..n_elite-1
         new_pop = np.empty_like(population)
         new_pop[:n_elite] = elites
 

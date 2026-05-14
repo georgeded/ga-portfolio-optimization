@@ -35,7 +35,7 @@ W_MAX_CONSTRAINED = 0.15
 
 
 def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
-    """Objective minimized by scipy SLSQP."""
+    """Negative Sharpe objective for SLSQP."""
     port_return = float(weights @ mu)
     port_var = float(weights @ sigma @ weights)
     if port_var <= 0:

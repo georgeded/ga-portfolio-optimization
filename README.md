@@ -47,7 +47,7 @@ The GA selects K ∈ [10, 30] stocks each period and optimises a Sharpe-minus-tu
 *HHI concentration over time. GA is more concentrated by construction (avg K=14 vs 867 for benchmarks) — HHI values are not directly comparable across strategies.*
 
 ![Adaptive cardinality K](results/figures/F5_cardinality.png)
-*Adaptive cardinality K over time. GA collapses to K≈10 post-GFC, reflecting higher estimation uncertainty.*
+*Adaptive cardinality K over time. GA collapses to K≈10 post-GFC.*
 
 ![Mean-variance frontier](results/figures/F6_frontier.png)
 *Mean-variance frontier at 3 representative dates (in-sample μ/Σ). GA operates inside the unconstrained frontier by design.*
@@ -90,7 +90,8 @@ ga-portfolio-optimization/
 │       ├── portfolio.py      # Shared portfolio utilities (drift, alignment, estimation window)
 │       └── data.py           # Data loading entry point
 ├── tests/
-│   └── test_metrics.py       # 38 unit tests for evaluation metrics
+│   ├── test_genetic_algorithm.py  # GA operator and feasibility tests
+│   └── test_metrics.py            # evaluation metrics tests
 ├── results/
 │   ├── figures/              # PNG outputs (not tracked)
 │   ├── tables/               # CSV + LaTeX outputs (not tracked)

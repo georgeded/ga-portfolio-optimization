@@ -305,4 +305,5 @@ if __name__ == "__main__":
         )
 
     if len(results) > 0:
-        print_results(results, f"GA (MEDIAN {n_runs} RUNS)")
+        n_runs_used = 3 if args.debug else args.n_runs
+        print_results(results, f"GA (MEDIAN {n_runs_used} RUNS)")

@@ -306,8 +306,7 @@ def plot_cardinality(data: dict) -> None:
     add_caption(fig,
         "K is selected adaptively by the GA within the constraint K ∈ [10, 30]. "
         "Monthly values (light) and 12-month rolling average (bold) are shown. "
-        "Post-GFC reduction to K≈10 reflects the GA preferring concentrated "
-        "portfolios during high estimation-error periods."
+        "K drops to ≈10 post-GFC and recovers gradually."
     )
 
     fig.tight_layout(rect=[0, 0.10, 1, 1])

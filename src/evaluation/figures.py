@@ -113,7 +113,7 @@ def add_crisis_shading(ax) -> None:
 
 
 def add_bottom_legend(fig, extra_handles: list = None, ncol: int = 6) -> None:
-    """Place a shared legend below the figure, including strategy lines + crisis patches."""
+    """Shared legend below the figure: strategy lines + crisis patches."""
     handles = make_strategy_handles() + make_crisis_handles()
     if extra_handles:
         handles += extra_handles

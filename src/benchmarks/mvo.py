@@ -106,9 +106,7 @@ def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma
     portfolio_excess = portfolio_gross - rf
 
     if prev_weights is not None and prev_permnos is not None:
-        prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
-        drifted = compute_drift_weights(prev_weights, prev_ret.values)
-        drifted_array = align_drifted_weights(drifted, prev_permnos, valid_permnos)
+        drifted_array = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
         to = portfolio_turnover(weights, drifted_array)
     else:
         to = 1.0
@@ -118,7 +116,7 @@ def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma
 
     result = {
         "date": apply_date,
-        "n_stocks": len(valid_permnos),
+        "n_stocks": int(np.sum(weights > 1e-6)),
         "portfolio_ret": portfolio_gross,
         "excess_ret": portfolio_excess,
         "rf": rf,

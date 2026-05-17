@@ -78,8 +78,8 @@ def _eval_period(
     gamma: float,
 ) -> tuple[dict | None, np.ndarray | None, list | None]:
     """Evaluate one period under given hyperparameters.
-    Canonical = median in-sample fitness (mirrors runner.py). pw_aligned + lambda_ passed
-    to ga_fitness so the turnover penalty matches what GA workers optimised against.
+    Mirrors runner.py: canonical by median in-sample fitness; pw_aligned + lambda_ passed
+    to ga_fitness so the penalty matches what GA workers optimised against.
     """
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
@@ -92,9 +92,7 @@ def _eval_period(
     n_assets = len(valid_permnos)
 
     if prev_weights is not None and prev_permnos is not None:
-        prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
-        drifted = compute_drift_weights(prev_weights, prev_ret.values)
-        pw_aligned = align_drifted_weights(drifted, prev_permnos, valid_permnos)
+        pw_aligned = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
     else:
         pw_aligned = None
 
@@ -110,10 +108,7 @@ def _eval_period(
     stock_rets = month_ret.values
     rf = get_rf_for_month(returns, apply_date)
 
-    gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
-    median_ret = float(np.median(gross_returns))
-
-    # pw_aligned + lambda_ passed so penalty matches what run_ga optimised (critical for LAMBDA tuning)
+    # pw_aligned + lambda_ match what GA optimised against — critical for LAMBDA tuning
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, params["lambda_"])
         for w in all_weights
@@ -122,7 +117,9 @@ def _eval_period(
     canonical_i = int(np.argmin(np.abs(in_sample_fitnesses - median_fitness)))
     canon_w = all_weights[canonical_i]
 
-    portfolio_excess = median_ret - rf
+    canon_gross = float(canon_w @ stock_rets)
+    portfolio_gross = canon_gross
+    portfolio_excess = portfolio_gross - rf
     turnover = (
         portfolio_turnover(canon_w, pw_aligned)
         if pw_aligned is not None else 1.0

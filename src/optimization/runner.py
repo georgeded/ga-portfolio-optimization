@@ -1,9 +1,9 @@
 """
 Out-of-sample GA experiment runner (252 monthly periods, Jan 2005 - Dec 2025).
 
-Each period: build mu/sigma from 60-month window -> run N_RUNS parallel GA instances
--> report median realised gross return -> use weights of the median-fitness run as the
-canonical portfolio for drift/turnover/prev_weights in the next period.
+Each period: build mu/sigma from 60-month window -> run N_RUNNERS parallel GA instances
+-> report canonical portfolio's realised gross return (median in-sample fitness run) ->
+carry its weights forward for drift/turnover/prev_weights in the next period.
 Checkpoints after every period so cloud jobs can resume safely.
 
 python3 -m src.optimization.runner (full run)
@@ -40,7 +40,7 @@ from src.utils.portfolio import (
     print_results,
 )
 
-N_RUNS     = 30
+N_RUNNERS  = 16
 BASE_SEED  = 1000        # run i uses seed BASE_SEED + i
 OUTPUT_DIR = "results/ga"
 CHECKPOINT         = os.path.join(OUTPUT_DIR, "checkpoint.parquet")
@@ -50,7 +50,7 @@ PERMNOS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_permnos.npy")
 
 
 # module-level for multiprocessing pickling
-def _run_single(args: tuple) -> np.ndarray:
+def run_single_ga(args: tuple) -> np.ndarray:
     """args: (n_assets, mu, sigma, prev_weights, seed, n_gens)"""
     n_assets, mu, sigma, prev_weights, seed, n_gens = args
 
@@ -65,6 +65,22 @@ def _run_single(args: tuple) -> np.ndarray:
     return w
 
 
+def set_affinity(core_id: int) -> None:
+    """Pin worker to one logical CPU. Best-effort, no crash."""
+    try:
+        allowed = sorted(os.sched_getaffinity(0))
+        cpu = allowed[core_id % len(allowed)]
+        os.sched_setaffinity(0, {cpu})
+    except (AttributeError, OSError):
+        pass
+
+
+def run_ga_with_affinity(args: tuple) -> np.ndarray:
+    core_id, actual_args = args
+    set_affinity(core_id)
+    return run_single_ga(actual_args)
+
+
 def _process_period(
     t: pd.Timestamp,
     apply_date: pd.Timestamp,
@@ -77,7 +93,7 @@ def _process_period(
     pool: Pool,
     gamma: float,
 ) -> tuple[dict, np.ndarray, list]:
-    """Returns (result_row, new_drifted_weights, new_permnos); drifted weights aligned to valid_permnos."""
+    """Returns (result_row, drifted_weights, permnos) for one rebalancing period."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
@@ -89,17 +105,16 @@ def _process_period(
     n_assets = len(valid_permnos)
 
     if prev_weights is not None and prev_permnos is not None:
-        prev_ret_series = get_monthly_returns(returns, prev_permnos, apply_date)
-        drifted = compute_drift_weights(prev_weights, prev_ret_series.values)
-        pw_aligned = align_drifted_weights(drifted, prev_permnos, valid_permnos)
+        pw_aligned = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
     else:
         pw_aligned = None
 
-    worker_args = [
+    ga_args_list = [
         (n_assets, mu, sigma, pw_aligned, BASE_SEED + i, n_gens)
         for i in range(n_runs)
     ]
-    all_weights: list[np.ndarray] = pool.map(_run_single, worker_args)
+    indexed_args = [(i % N_RUNNERS, arg) for i, arg in enumerate(ga_args_list)]
+    all_weights: list[np.ndarray] = pool.map(run_ga_with_affinity, indexed_args)
 
     month_ret = get_monthly_returns(returns, valid_permnos, apply_date)
     stock_rets = month_ret.values
@@ -107,13 +122,8 @@ def _process_period(
 
     gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
 
-    median_ret = float(np.median(gross_returns))
-    portfolio_gross = median_ret
-    portfolio_excess = portfolio_gross - rf
-
-    # canonical = run at median IN-SAMPLE fitness (not realised return) — avoids ex-post
-    # return dependency for prev_weights. pw_aligned ensures penalty is consistent
-    # with what run_ga optimised against.
+    # canonical = median in-sample fitness run (not realised return) —
+    # avoids ex-post dependency; pw_aligned matches what GA optimised against.
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, ga_module.LAMBDA)
         for w in all_weights
@@ -121,6 +131,10 @@ def _process_period(
     median_fitness = float(np.median(in_sample_fitnesses))
     canonical_i = int(np.argmin(np.abs(in_sample_fitnesses - median_fitness)))
     canon_w = all_weights[canonical_i]
+
+    canon_gross = float(canon_w @ stock_rets)
+    portfolio_gross = canon_gross
+    portfolio_excess = portfolio_gross - rf
 
     if pw_aligned is not None:
         turnover = portfolio_turnover(canon_w, pw_aligned)
@@ -140,7 +154,7 @@ def _process_period(
         "turnover":       turnover,
         "cost":           cost,
         "hhi":            herfindahl_index(canon_w),
-        # cross-run dispersion — addresses stochasticity threat to validity
+        # cross-run dispersion — how much results vary across GA runs
         "gross_ret_std":  float(np.std(gross_returns)),
         "gross_ret_iqr":  float(np.percentile(gross_returns, 75) -
                                np.percentile(gross_returns, 25)),
@@ -185,7 +199,7 @@ def _clear_checkpoint() -> None:
     print("Checkpoint cleared.")
 
 
-def run(n_runs: int = N_RUNS, n_gens: int = ga_module.N_GENS,
+def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
         max_periods: int | None = None, gamma: float = TRANSACTION_COST,
         clear_checkpoint: bool = False) -> pd.DataFrame:
     """Run the full OOS GA experiment with checkpointing. Returns monthly results DataFrame."""
@@ -220,10 +234,9 @@ def run(n_runs: int = N_RUNS, n_gens: int = ga_module.N_GENS,
     print(f"Periods to process : {len(remaining)}")
     print(f"Parallel runs      : {n_runs}  |  Max generations: {n_gens}")
 
-    n_workers = min(n_runs, mp.cpu_count())
     t0_total = time.time()
 
-    with mp.Pool(processes=n_workers) as pool:
+    with mp.Pool(processes=N_RUNNERS) as pool:
         for t in tqdm(remaining, desc="GA out-of-sample"):
 
             apply_dates = [
@@ -280,7 +293,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Delete existing checkpoint before running",
     )
-    parser.add_argument("--n-runs",      type=int,   default=N_RUNS)
+    parser.add_argument("--n-runs",      type=int,   default=N_RUNNERS)
     parser.add_argument("--n-gens",      type=int,   default=ga_module.N_GENS)
     parser.add_argument("--max-periods", type=int,   default=None)
     parser.add_argument("--gamma",       type=float, default=TRANSACTION_COST)
@@ -306,4 +319,4 @@ if __name__ == "__main__":
 
     if len(results) > 0:
         n_runs_used = 3 if args.debug else args.n_runs
-        print_results(results, f"GA (MEDIAN {n_runs_used} RUNS)")
+        print_results(results, f"GA (CANONICAL, {n_runs_used} RUNS)")

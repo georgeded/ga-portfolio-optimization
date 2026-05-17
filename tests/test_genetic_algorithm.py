@@ -164,9 +164,7 @@ class TestRepair:
             if w.sum() > 0:
                 w /= w.sum()
 
-            # use different seeds for first and second repair call to expose
-            # any stochastic inconsistency — true idempotence must hold
-            # regardless of which random choices are made during repair
+            # different seeds expose stochastic inconsistency — idempotence must hold for any RNG state
             r1 = repair(w,         np.random.default_rng(0))
             r2 = repair(r1.copy(), np.random.default_rng(1))
             np.testing.assert_allclose(r1, r2, atol=1e-10,
@@ -380,8 +378,7 @@ class TestTournamentSelect:
     def test_selection_pressure_empirical(self):
         """
         Best individual must be selected significantly more often than chance.
-        Threshold is set relative to uniform baseline (1/n) to remain valid
-        if TOURNAMENT changes.
+        Threshold is 2× the uniform baseline (1/n) so the test stays valid if TOURNAMENT changes.
         """
         n         = 20
         rng       = np.random.default_rng(7)

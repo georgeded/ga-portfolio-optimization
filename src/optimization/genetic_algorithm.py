@@ -29,8 +29,8 @@ DEBUG = False
 
 def project_bounded_simplex(v, lower, upper, tol=1e-12):
     """
-    Exact projection onto {Σw=1, lower ≤ w_i ≤ upper} via bisection on the Lagrange multiplier.
-    Replaces iterative clip-normalize; enforces constraints in a single pass.
+    Project onto {Σw=1, lower ≤ w_i ≤ upper} via bisection on the Lagrange multiplier.
+    Single-pass; replaces iterative clip-normalize.
     """
     v = np.asarray(v, dtype=float)
     n = len(v)
@@ -61,7 +61,7 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
 def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.ndarray:
     """
     Cardinality first (K_MIN ≤ K ≤ K_MAX), then bounded-simplex projection.
-    At most one recursive call for the rare case where projection drops a weight below W_MIN.
+    At most one recursive call — projection can occasionally drop a weight below W_MIN.
     """
     if depth > 1:
         raise ValueError("Repair recursion exceeded 1 call.")
@@ -126,8 +126,8 @@ def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.
 
 def initialize_population(n_assets: int, rng: np.random.Generator) -> np.ndarray:
     """
-    K ~ Uniform[K_MIN, K_MAX] stocks per individual; Dirichlet weights; repair applied.
-    Seeds must be independent across parallel runs (runner.py uses BASE_SEED + i).
+    K ~ Uniform[K_MIN, K_MAX] stocks each; Dirichlet weights; repair applied.
+    Seeds must be independent across parallel runs — runner.py uses BASE_SEED + i.
     """
     population = np.zeros((POP_SIZE, n_assets))
 
@@ -169,8 +169,8 @@ def fitness(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
 def tournament_select(population: np.ndarray, fitnesses: np.ndarray,
                       rng: np.random.Generator, k: int = TOURNAMENT) -> np.ndarray:
     """
-    Sample k individuals (replace=False), return the best.
-    replace=False avoids the degenerate case where all slots are filled by the same individual.
+    Sample k individuals without replacement, return the fittest.
+    Without replacement avoids all k slots going to the same individual.
     """
     k = min(k, len(population))
     indices = rng.choice(len(population), size=k, replace=False)
@@ -206,7 +206,7 @@ def _make_child(w1: np.ndarray, w2: np.ndarray, rng: np.random.Generator) -> np.
     w_child = np.zeros(N)
     w_child[selected] = alpha * w1[selected] + (1.0 - alpha) * w2[selected]
 
-    # phantom tiny weights from small-α exclusive stocks confuse repair's cardinality count
+    # tiny weights from exclusive-parent stocks confuse repair's cardinality count
     w_child[w_child < 1e-10] = 0.0
 
     return repair(w_child, rng)
@@ -278,7 +278,7 @@ def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
 
         i, j = rng.choice(held, size=2, replace=False)
 
-        # maximum transferable amount that keeps both weights in [W_MIN, W_MAX]
+        # max shift that keeps both weights in [W_MIN, W_MAX]
         delta = min(LOCAL_STEP,
                     w_best[i] - W_MIN,
                     W_MAX - w_best[j])
@@ -324,7 +324,7 @@ def run_ga(n_assets: int, mu: np.ndarray, sigma: np.ndarray,
         elites = population[elite_idx].copy()
         elite_fit = fitnesses[elite_idx].copy()
 
-        # local_refine returns (w, f) — fitness reused, avoiding one redundant evaluation
+        # local_refine returns (w, f) — reuse fitness, skip one eval
         elites[-1], elite_fit[-1] = local_refine(
             elites[-1], mu, sigma, prev_weights, rng
         )

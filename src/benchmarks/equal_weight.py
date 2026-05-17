@@ -53,9 +53,7 @@ def run_equal_weight(universe: pd.DataFrame, returns: pd.DataFrame,
         portfolio_excess = portfolio_gross - rf
 
         if prev_weights is not None and prev_permnos is not None:
-            prev_ret = get_monthly_returns(returns, prev_permnos, apply_date)
-            drifted = compute_drift_weights(prev_weights, prev_ret.values)
-            drifted_array = align_drifted_weights(drifted, prev_permnos, eligible)
+            drifted_array = align_drifted_weights(prev_weights, prev_permnos, eligible)
             turnover = portfolio_turnover(weights, drifted_array)
         else:
             turnover = 1.0

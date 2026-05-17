@@ -52,8 +52,8 @@ def cap_universe(universe: pd.DataFrame, returns: pd.DataFrame, top_n: int = 200
 
 
 def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_permnos: list) -> np.ndarray:
-    """Reindex drifted weights to the current universe (new/departed stocks → 0).
-    Falls back to equal weight if all prior holdings have left the universe.
+    """Align drifted weights to the current universe (new/departed stocks → 0).
+    Falls back to equal weight if all holdings have left the universe.
     """
     aligned = (pd.Series(prev_weights, index=prev_permnos)
                .reindex(curr_permnos, fill_value=0.0)
@@ -69,8 +69,7 @@ def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_per
 
 def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: pd.Timestamp) -> tuple:
     """Build mu and sigma from the 60-month window [t-60, t-1].
-    Drops stocks with any missing observation — ensures full-rank input
-    before regularization (sigma + 1e-4 * I).
+    Drops stocks with any missing month — regularises sigma with + 1e-4 * I.
     """
     window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
@@ -100,7 +99,7 @@ def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: 
 
 def print_results(results: pd.DataFrame, label: str, gamma: float = TRANSACTION_COST,
                   show_theoretical_hhi: bool = False) -> None:
-    """show_theoretical_hhi: also prints the 1/K lower bound; only meaningful for equal-weight."""
+    """show_theoretical_hhi: print the 1/K lower bound — only meaningful for equal-weight."""
     clean = results.dropna(subset=["excess_ret", "rf", "turnover"])
     excess = clean["excess_ret"].values
     rf = clean["rf"].values

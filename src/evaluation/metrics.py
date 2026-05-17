@@ -16,7 +16,7 @@ def annualized_return(excess_returns: np.ndarray) -> float:
 
 
 def annualized_volatility(excess_returns: np.ndarray) -> float:
-    """Annualized std of excess returns (ddof=1, × √12). Clipped to 0.0 against float noise."""
+    """Annualized std of excess returns (ddof=1, × √12). Clamped to 0 against float noise."""
     vol = float(np.std(excess_returns, ddof=1) * SQRT_12)
     return max(vol, 0.0)
 
@@ -48,7 +48,7 @@ def max_drawdown(cumulative_returns: np.ndarray) -> float:
 
 
 def compute_cumulative_returns(excess_returns: np.ndarray, rf: np.ndarray) -> np.ndarray:
-    """Compound monthly (excess_ret + rf) into a cumulative value series starting at 1.0."""
+    """Compound (excess_ret + rf) into a wealth index starting at 1.0."""
     total_returns = excess_returns + rf
     return np.cumprod(1 + total_returns)
 
@@ -107,7 +107,7 @@ def compute_all_metrics(
 
 
 def format_metrics(metrics: dict) -> pd.DataFrame:
-    """Format compute_all_metrics() output into a single-row DataFrame for Table 1."""
+    """Format the metrics dict into a single-row DataFrame for Table 1."""
     display_names = {
         "ann_return_net": "Annualized Return (net)",
         "ann_vol": "Annualized Volatility",

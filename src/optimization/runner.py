@@ -40,7 +40,7 @@ from src.utils.portfolio import (
     print_results,
 )
 
-N_RUNNERS  = 16
+N_RUNNERS  = 8
 BASE_SEED  = 1000        # run i uses seed BASE_SEED + i
 OUTPUT_DIR = "results/ga"
 CHECKPOINT         = os.path.join(OUTPUT_DIR, "checkpoint.parquet")

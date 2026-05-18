@@ -120,7 +120,7 @@ ga-portfolio-optimization/
 - Operators: tournament selection (k=3), blend crossover (pc=0.6054), Gaussian weight mutation + asset-swap (pm=0.137, σ_m=0.1469)
 - Population: 100 | Generations: 200 | Early stop: 20 stagnant generations
 - Local refinement: greedy pairwise weight-shift hill-climber on best elite each generation
-- 30 independent runs per period; canonical portfolio selected at median in-sample fitness
+- 8 independent runs per period; canonical portfolio selected at median in-sample fitness
 
 **MVO benchmarks**
 - Unconstrained: maximize Sharpe, long-only bounds [0, 1], SLSQP
@@ -131,7 +131,7 @@ ga-portfolio-optimization/
 - 252 monthly OOS periods, January 2005 – December 2025
 - Transaction cost: γ = 0.3% per unit turnover (applied to all strategies)
 - Turnover computed against post-drift pre-rebalance weights
-- Checkpointing after every period; cloud runs on Google Cloud c2-standard-8
+- Checkpointing after every period for resumable long-running experiments
 
 **Statistical tests**
 - Paired t-test: H₀: mean return difference = 0
@@ -165,11 +165,11 @@ python3 -m src.data.loader
 # Build eligible universe (487–1,105 stocks/month)
 python3 -m src.data.universe
 
-# Compute excess returns
-python3 -m src.data.returns
-
 # Process risk-free rate
 python3 -m src.data.risk_free_rate
+
+# Compute excess returns
+python3 -m src.data.returns
 ```
 
 **2. Hyperparameter tuning** *(optional — pre-tuned values already in `genetic_algorithm.py`)*
@@ -188,7 +188,7 @@ python3 -m src.benchmarks.equal_weight
 **4. GA out-of-sample experiment**
 
 ```bash
-# Full run (30 parallel runs × 200 generations × 252 periods — compute-intensive)
+# Full run (8 parallel runs × 200 generations × 252 periods — compute-intensive)
 python3 -m src.optimization.runner
 
 # Debug mode (3 runs, 50 generations, 10 periods)

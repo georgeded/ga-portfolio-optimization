@@ -1,9 +1,9 @@
 """
 Out-of-sample GA experiment runner (252 monthly periods, Jan 2005 - Dec 2025).
 
-Each period: build mu/sigma from 60-month window -> run N_RUNNERS parallel GA instances
--> report canonical portfolio's realised gross return (median in-sample fitness run) ->
-carry its weights forward for drift/turnover/prev_weights in the next period.
+For each period, estimates mu/sigma from the trailing 60-month window,
+runs N_RUNNERS GA instances in parallel, and carries the canonical
+portfolio weights forward into the next period.
 Checkpoints after every period so cloud jobs can resume safely.
 
 python3 -m src.optimization.runner (full run)
@@ -122,8 +122,7 @@ def _process_period(
 
     gross_returns = np.array([float(w @ stock_rets) for w in all_weights])
 
-    # canonical = median in-sample fitness run (not realised return) —
-    # avoids ex-post dependency; pw_aligned matches what GA optimised against.
+    # Pick the median in-sample run, not the best realised return.
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, ga_module.LAMBDA)
         for w in all_weights
@@ -154,7 +153,7 @@ def _process_period(
         "turnover":       turnover,
         "cost":           cost,
         "hhi":            herfindahl_index(canon_w),
-        # cross-run dispersion — how much results vary across GA runs
+        # Spread across the independent GA runs
         "gross_ret_std":  float(np.std(gross_returns)),
         "gross_ret_iqr":  float(np.percentile(gross_returns, 75) -
                                np.percentile(gross_returns, 25)),
@@ -226,13 +225,13 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
             _load_checkpoint()
         print(f"Resuming from checkpoint: {len(completed_results)} periods done.")
         if prev_weights is not None:
-            print("  prev_weights state recovered — turnover will be accurate.")
+            print("  prev_weights state recovered; turnover will be accurate.")
         else:
-            print("  prev_weights not found — first resumed period uses turnover=1.0.")
+            print("  prev_weights not found; first resumed period uses turnover=1.0.")
 
     remaining = [t for t in rebalance_dates if t not in completed_dates]
-    print(f"Periods to process : {len(remaining)}")
-    print(f"Parallel runs      : {n_runs}  |  Max generations: {n_gens}")
+    print(f"Periods remaining: {len(remaining)}")
+    print(f"Runs: {n_runs}, max generations: {n_gens}")
 
     t0_total = time.time()
 
@@ -300,7 +299,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.debug:
-        print("=== DEBUG MODE: 3 runs | 50 gens | 10 periods ===")
+        print("debug mode: 3 runs, 50 gens, 10 periods")
         results = run(
             n_runs=3,
             n_gens=50,

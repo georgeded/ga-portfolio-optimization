@@ -106,7 +106,7 @@ def run_convergence_for_config(mu: np.ndarray, sigma: np.ndarray,
         ga_module.SIGMA_M = orig_sigma_m
         ga_module.LAMBDA = orig_lambda
 
-    # pad shorter runs with final value (early stopping → converged)
+    # Pad shorter runs with their final value after early stopping.
     max_len = max(len(h) for h in all_histories)
     padded = np.array([
         h + [h[-1]] * (max_len - len(h))

@@ -108,7 +108,7 @@ def _eval_period(
     stock_rets = month_ret.values
     rf = get_rf_for_month(returns, apply_date)
 
-    # pw_aligned + lambda_ match what GA optimised against — critical for LAMBDA tuning
+    # Use the same penalty setup as the worker runs.
     in_sample_fitnesses = np.array([
         ga_fitness(w, mu, sigma, pw_aligned, params["lambda_"])
         for w in all_weights
@@ -221,7 +221,7 @@ def run_tuner(
 
     n_workers = min(n_runs, mp.cpu_count())
 
-    print(f"Tuning period : {tuning_dates[0].date()} → {tuning_dates[-1].date()}")
+    print(f"Tuning period : {tuning_dates[0].date()} to {tuning_dates[-1].date()}")
     print(f"Periods       : {len(tuning_dates)}")
     print(f"Trials        : {n_trials}")
     print(f"Runs/period   : {n_runs}  |  Max gens: {n_gens}  |  Workers: {n_workers}")
@@ -321,7 +321,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.debug:
-        print("=== DEBUG MODE: 5 trials | 3 runs | 30 gens | 12 periods ===")
+        print("debug mode: 5 trials, 3 runs, 30 gens, 12 periods")
         run_tuner(n_trials=5, n_runs=3, n_gens=30, max_periods=12, gamma=args.gamma)
     else:
         run_tuner(

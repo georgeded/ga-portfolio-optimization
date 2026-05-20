@@ -148,7 +148,7 @@ cd ga-portfolio-optimization
 pip install -r requirements.txt
 ```
 
-> **Data access:** Raw CRSP data requires a WRDS subscription. Download the monthly stock file (CIZ format, 2000–2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
+Raw CRSP data requires a WRDS subscription. Download the monthly stock file (CIZ format, 2000–2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
 
 ---
 
@@ -188,7 +188,7 @@ python3 -m src.benchmarks.equal_weight
 **4. GA out-of-sample experiment**
 
 ```bash
-# Full run (8 parallel runs × 200 generations × 252 periods — compute-intensive)
+# Full run; takes several hours
 python3 -m src.optimization.runner
 
 # Debug mode (3 runs, 50 generations, 10 periods)

@@ -138,16 +138,16 @@ def validate_universe(universe: dict) -> None:
 
     empty = sizes[sizes == 0]
     assert len(empty) == 0, f"Empty universe at: {empty.index.tolist()}"
-    print("✓ No empty universes")
+    print("No empty universes")
 
     # sudden jump (>50% MoM) signals a data error, not methodology
     pct_change = sizes.pct_change().abs()
     large_jumps = pct_change[pct_change > 0.5]
     if len(large_jumps) > 0:
-        print(f"⚠ Large universe size jumps at: "
+        print(f"Large universe size jumps at: "
               f"{large_jumps.index.tolist()}")
     else:
-        print("✓ Universe size stable over time")
+        print("Universe size stable over time")
 
     print("\nUniverse size summary (descriptive):")
     print(f"  Mean   : {sizes.mean():.0f} stocks")

@@ -321,7 +321,7 @@ if __name__ == "__main__":
     print("Loading data...")
     data = load_all()
 
-    print(f"\nGenerating figures → {OUT_DIR}/\n")
+    print(f"\nGenerating figures in {OUT_DIR}/\n")
     plot_cumulative_returns(data)
     plot_rolling_sharpe(data)
     plot_turnover(data)

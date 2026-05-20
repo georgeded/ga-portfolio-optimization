@@ -11,7 +11,7 @@ import os
 SQRT_12 = np.sqrt(12)
 OUT_DIR = "results/tables"
 
-# --- Table 1 columns ---
+# Table 1
 COL_RETURN   = "Annualized Return (net)"
 COL_VOL      = "Annualized Volatility"
 COL_SHARPE   = "Sharpe Ratio (net)"
@@ -33,7 +33,7 @@ COL_LATEX_T1 = {
     COL_COST:     "Avg Cost",
 }
 
-# --- Table 3 columns ---
+# Table 3
 COL_K     = "Avg Portfolio Size (K)"
 COL_HHI   = "Avg HHI"
 COL_TO3   = "Avg Monthly Turnover"
@@ -82,8 +82,6 @@ def to_png(fmt: pd.DataFrame, path: str, fontsize: int = 10) -> None:
     plt.close(fig)
     print(f"Saved: {path}")
 
-
-# --- Table 1 ---
 
 def compute_table1_metrics(df: pd.DataFrame) -> dict:
     """Compute all Table 1 metrics for a single strategy."""
@@ -153,13 +151,10 @@ def format_table1(table: pd.DataFrame) -> pd.DataFrame:
 
 
 def print_table1(fmt: pd.DataFrame) -> None:
-    print("\n" + "="*80)
-    print("TABLE 1 — Main Performance Comparison (net of transaction costs)")
-    print("="*80)
+    print("\nTable 1: Main performance comparison, net of transaction costs")
     print("Period: 2005-01-31 to 2025-12-31 | 252 monthly observations")
     print("Transaction cost: γ = 0.3% per unit traded\n")
     print(fmt.to_string())
-    print("="*80)
 
 
 def to_latex_t1(fmt: pd.DataFrame) -> str:
@@ -177,8 +172,6 @@ def to_latex_t1(fmt: pd.DataFrame) -> str:
         bold_rows=False,
     )
 
-
-# --- Table 3 ---
 
 def compute_table3_metrics(df: pd.DataFrame) -> dict:
     """
@@ -227,12 +220,9 @@ def format_table3(table: pd.DataFrame) -> pd.DataFrame:
 
 
 def print_table3(fmt: pd.DataFrame) -> None:
-    print("\n" + "="*80)
-    print("TABLE 3 — Portfolio Characteristics (RQ3)")
-    print("="*80)
+    print("\nTable 3: Portfolio characteristics")
     print("Period: 2005-01-31 to 2025-12-31 | 252 monthly observations\n")
     print(fmt.to_string())
-    print("="*80)
 
 
 def to_latex_t3(fmt: pd.DataFrame) -> str:

@@ -41,28 +41,28 @@ def load_crsp_csv(path: str = "data/raw/crsp_returns.csv") -> pd.DataFrame:
 
 def validate_raw_data(df: pd.DataFrame) -> None:
     """Sanity checks on raw data before any filtering."""
-    print("\n--- Validation ---")
+    print("\nValidation")
 
     print(f"Date range: {df['date'].min().date()} "
           f"to {df['date'].max().date()}")
 
     assert len(df) > 100_000, f"Too few rows: {len(df)}"
-    print(f"✓ Row count: {len(df):,}")
+    print(f"Row count: {len(df):,}")
 
     n_stocks = df['permno'].nunique()
     assert n_stocks > 500, f"Too few unique stocks: {n_stocks}"
-    print(f"✓ Unique stocks: {n_stocks:,}")
+    print(f"Unique stocks: {n_stocks:,}")
 
     exchanges = df['exchcd'].dropna().unique()
-    print(f"✓ Exchanges present: {sorted(exchanges)}")
+    print(f"Exchanges present: {sorted(exchanges)}")
 
     ret_pct = df['ret'].notna().mean() * 100
-    print(f"✓ Return coverage: {ret_pct:.1f}% non-missing")
+    print(f"Return coverage: {ret_pct:.1f}% non-missing")
 
     print("\nShare type distribution:")
     print(df['sharetype'].value_counts().head(10))
 
-    print("\n--- Validation passed ---\n")
+    print("\nValidation passed\n")
 
 
 if __name__ == "__main__":

@@ -136,32 +136,29 @@ def build_table2(
     fmt[COL_MEAN_DIFF] = (raw[COL_MEAN_DIFF] * 100).map("{:.2f}%".format)
     fmt[COL_T_STAT]    = raw[COL_T_STAT].map("{:.3f}".format)
     fmt[COL_T_PVAL]    = raw[COL_T_PVAL].map("{:.4f}".format)
-    fmt[COL_T_SIG]     = raw[COL_T_SIG].map(lambda x: "✓" if x else "✗")
+    fmt[COL_T_SIG]     = raw[COL_T_SIG].map(lambda x: "yes" if x else "no")
     fmt[COL_SR_GA]     = raw[COL_SR_GA].map("{:.4f}".format)
     fmt[COL_SR_BENCH]  = raw[COL_SR_BENCH].map("{:.4f}".format)
     fmt[COL_SR_DIFF]   = raw[COL_SR_DIFF].map("{:.4f}".format)
     fmt[COL_Z_STAT]    = raw[COL_Z_STAT].map("{:.3f}".format)
     fmt[COL_JK_PVAL]   = raw[COL_JK_PVAL].map("{:.4f}".format)
-    fmt[COL_JK_SIG]    = raw[COL_JK_SIG].map(lambda x: "✓" if x else "✗")
+    fmt[COL_JK_SIG]    = raw[COL_JK_SIG].map(lambda x: "yes" if x else "no")
 
     return raw, fmt
 
 
 def print_table2(fmt: pd.DataFrame) -> None:
-    print("\n" + "="*80)
-    print("TABLE 2 — Statistical Significance of Performance Differences")
-    print("="*80)
+    print("\nTable 2: Statistical significance of performance differences")
     print("Sample: 252 monthly observations | α = 0.05 (two-tailed)\n")
 
-    print("TEST 1: Paired t-test (H0: mean return difference = 0)")
+    print("Paired t-test (H0: mean return difference = 0)")
     print(fmt[[COL_MEAN_DIFF, COL_T_STAT, COL_T_PVAL, COL_T_SIG]].to_string())
 
-    print("\nTEST 2: Jobson-Korkie (Memmel 2003) (H0: Sharpe difference = 0)")
+    print("\nJobson-Korkie (Memmel 2003), H0: Sharpe difference = 0")
     print(fmt[[COL_SR_GA, COL_SR_BENCH, COL_SR_DIFF,
                COL_Z_STAT, COL_JK_PVAL, COL_JK_SIG]].to_string())
 
-    print("\nNOTE: JK assumes i.i.d. normal returns — interpret with caution.")
-    print("="*80)
+    print("\nJK assumes i.i.d. normal returns.")
 
 
 def to_png(fmt: pd.DataFrame, path: str) -> None:

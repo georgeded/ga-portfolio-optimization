@@ -28,9 +28,7 @@ def compute_drift_weights(weights: np.ndarray, stock_returns: np.ndarray) -> np.
     return drifted / total
 
 
-# NOTE: cap_universe() is kept for reference but not used in the
-# main experiment. All models now use the full eligible universe
-# per supervisor feedback (April 2026).
+# Kept for reference; the main experiment uses the full eligible universe
 def cap_universe(universe: pd.DataFrame, returns: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
     returns = returns.copy()
     returns["mktcap"] = returns["prc"].abs() * returns["shrout"] * 1000
@@ -107,22 +105,19 @@ def print_results(results: pd.DataFrame, label: str, gamma: float = TRANSACTION_
 
     metrics = compute_all_metrics(excess, rf, turnovers, gamma)
 
-    print("\n" + "="*50)
-    print(f"{label} RESULTS")
-    print("="*50)
-    print(f"Period : {results['date'].min().date()} "
+    print(f"\n{label}")
+    print(f"Period: {results['date'].min().date()} "
           f"to {results['date'].max().date()}")
-    print(f"Months : {len(results)}")
-    print(f"Avg N  : {results['n_stocks'].mean():.0f} stocks")
+    print(f"Months: {len(results)}")
+    print(f"Avg N: {results['n_stocks'].mean():.0f} stocks")
     print()
-    print(f"Sharpe Ratio (net)     : {metrics['sharpe_net']:.4f}")
-    print(f"Sharpe Ratio (gross)   : {metrics['sharpe_gross']:.4f}")
+    print(f"Sharpe (net): {metrics['sharpe_net']:.4f}")
+    print(f"Sharpe (gross): {metrics['sharpe_gross']:.4f}")
     print(f"Annualized Return (net): {metrics['ann_return_net']*100:.2f}%")
-    print(f"Annualized Volatility  : {metrics['ann_vol']*100:.2f}%")
-    print(f"Max Drawdown (net)     : {metrics['max_drawdown_net']*100:.2f}%")
-    print(f"Avg Monthly Turnover   : {metrics['avg_turnover']*100:.2f}%")
-    print(f"Avg Transaction Cost   : {metrics['avg_transaction_cost']*100:.4f}%")
-    print(f"Avg HHI                : {results['hhi'].mean():.6f}")
+    print(f"Annualized Volatility: {metrics['ann_vol']*100:.2f}%")
+    print(f"Max Drawdown (net): {metrics['max_drawdown_net']*100:.2f}%")
+    print(f"Avg Monthly Turnover: {metrics['avg_turnover']*100:.2f}%")
+    print(f"Avg Transaction Cost: {metrics['avg_transaction_cost']*100:.4f}%")
+    print(f"Avg HHI: {results['hhi'].mean():.6f}")
     if show_theoretical_hhi:
-        print(f"Theoretical min HHI    : {(1/results['n_stocks'].mean()):.6f}")
-    print("="*50)
+        print(f"Theoretical min HHI: {(1/results['n_stocks'].mean()):.6f}")

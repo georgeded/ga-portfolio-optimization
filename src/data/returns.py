@@ -61,24 +61,24 @@ def compute_excess_returns(universe: pd.DataFrame, crsp: pd.DataFrame, rf: pd.Da
 
 def validate_excess_returns(df: pd.DataFrame) -> None:
     """Sanity checks on excess returns."""
-    print("\n--- Validation ---")
+    print("\nValidation")
 
     missing_rf = df["rf"].isna().sum()
     assert missing_rf == 0, f"Missing rf for {missing_rf:,} rows"
-    print("✓ No missing risk-free rate values")
+    print("No missing risk-free rate values")
 
-    print("✓ Excess return stats:")
+    print("Excess return stats:")
     print(f"  Mean  : {df['excess_ret'].mean():.4f}")
     print(f"  Std   : {df['excess_ret'].std():.4f}")
     print(f"  Min   : {df['excess_ret'].min():.4f}")
     print(f"  Max   : {df['excess_ret'].max():.4f}")
 
-    print(f"✓ Date range: {df['date'].min().date()} "
+    print(f"Date range: {df['date'].min().date()} "
           f"to {df['date'].max().date()}")
 
-    print(f"✓ rf range: {df['rf'].min():.6f} to {df['rf'].max():.6f}")
+    print(f"rf range: {df['rf'].min():.6f} to {df['rf'].max():.6f}")
 
-    print("--- Validation passed ---\n")
+    print("Validation passed\n")
 
 
 if __name__ == "__main__":

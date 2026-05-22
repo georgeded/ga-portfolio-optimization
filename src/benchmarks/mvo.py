@@ -32,6 +32,7 @@ W_MIN_UNCONSTRAINED = 0.0
 W_MAX_UNCONSTRAINED = 1.0
 W_MIN_CONSTRAINED = 0.0
 W_MAX_CONSTRAINED = 0.15
+_solver_failures = 0
 
 
 def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
@@ -78,6 +79,8 @@ def optimize_mvo(mu: np.ndarray, sigma: np.ndarray, w_min: float, w_max: float,
             continue
 
     if best_weights is None:
+        global _solver_failures
+        _solver_failures += 1
         best_weights = np.ones(N) / N
 
     best_weights = np.clip(best_weights, w_min, w_max)
@@ -134,6 +137,7 @@ def run_mvo(universe: pd.DataFrame, returns: pd.DataFrame, constrained: bool = F
     """Run MVO over all rebalancing dates.
     constrained=True uses bounds [0, 0.15]; False uses [0, 1.0].
     """
+    global _solver_failures
     rng = np.random.default_rng(seed)
     w_min = W_MIN_CONSTRAINED if constrained else W_MIN_UNCONSTRAINED
     w_max = W_MAX_CONSTRAINED if constrained else W_MAX_UNCONSTRAINED
@@ -161,6 +165,10 @@ def run_mvo(universe: pd.DataFrame, returns: pd.DataFrame, constrained: bool = F
         )
         if result is not None:
             results.append(result)
+
+    print(f"MVO solver fallbacks: {_solver_failures} / "
+          f"{len(rebalance_dates)} periods")
+    _solver_failures = 0  # reset for next call
 
     return pd.DataFrame(results)
 

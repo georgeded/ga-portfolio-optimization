@@ -14,7 +14,11 @@ import os
 
 from src.utils.portfolio import get_estimation_window
 from src.utils.data import load_data
-from src.benchmarks.mvo import optimize_mvo
+from src.benchmarks.mvo import (
+    optimize_mvo,
+    W_MIN_UNCONSTRAINED, W_MAX_UNCONSTRAINED,
+    W_MIN_CONSTRAINED,   W_MAX_CONSTRAINED,
+)
 from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga
 
@@ -131,11 +135,15 @@ def get_portfolio_weights(mu: np.ndarray, sigma: np.ndarray, n_assets: int) -> d
 
     print("    Running Unconstrained MVO...")
     rng = np.random.default_rng(BASE_SEED)
-    mvo_unc_w = optimize_mvo(mu=mu, sigma=sigma, w_min=0.0, w_max=1.0, rng=rng)
+    mvo_unc_w = optimize_mvo(mu=mu, sigma=sigma,
+                             w_min=W_MIN_UNCONSTRAINED,
+                             w_max=W_MAX_UNCONSTRAINED, rng=rng)
 
     print("    Running Constrained MVO...")
     rng = np.random.default_rng(BASE_SEED)
-    mvo_con_w = optimize_mvo(mu=mu, sigma=sigma, w_min=0.0, w_max=0.15, rng=rng)
+    mvo_con_w = optimize_mvo(mu=mu, sigma=sigma,
+                             w_min=W_MIN_CONSTRAINED,
+                             w_max=W_MAX_CONSTRAINED, rng=rng)
 
     ew_w = np.ones(n_assets) / n_assets
 
@@ -183,7 +191,7 @@ def run_frontier() -> None:
         if len(vols_con) > 1:
             ax.plot(vols_con * 100, rets_con * 100,
                     color="#666666", lw=1.5, ls="--",
-                    label="Frontier (w ≤ 0.15)", zorder=2)
+                    label=f"Frontier (w ≤ {W_MAX_CONSTRAINED:.2f})", zorder=2)
 
         print("  Computing portfolio positions...")
         weights = get_portfolio_weights(mu, sigma, n_assets)

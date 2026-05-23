@@ -1,0 +1,4 @@
+Comparison,Mean Diff (ann.),t-stat,t p-value,t Sig.,SR(GA),SR(Bench),SR Diff,z-stat,JK p-value,JK Sig.
+GA vs 1/N,-5.15%,-1.756,0.0803,no,0.2355,0.5262,-0.2908,-1.708,0.0876,no
+GA vs Unconstrained MVO,-3.62%,-1.864,0.0635,no,0.2355,0.5605,-0.3250,-2.765,0.0057,yes
+GA vs Constrained MVO,-3.58%,-1.837,0.0674,no,0.2355,0.5572,-0.3217,-2.730,0.0063,yes

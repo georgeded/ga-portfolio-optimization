@@ -1,0 +1,14 @@
+\begin{table}
+\caption{Portfolio characteristics across strategies (January 2005--December 2025). \textit{Avg K}: average number of stocks held per period. For the GA, $K \in [10, 30]$ is enforced by the cardinality constraint (adaptive selection); for MVO and 1/N, K reflects the full eligible universe ($\approx 867$) and is not a design parameter. \textit{HHI}: Herfindahl-Hirschman Index; theoretical minimum is $1/K$, so values are not directly comparable across strategies with different $K$ (GA lower bound $\approx 0.071$; MVO/1/N lower bound $\approx 0.001$). Transaction cost $\gamma = 0.3\%$ per unit traded.}
+\label{tab:characteristics}
+\begin{tabular}{lrrrr}
+\toprule
+ & Avg K & Avg HHI & Turnover & Avg Cost \\
+\midrule
+GA (adaptive K) & 14.4 & 0.095700 & 21.34% & 0.0640% \\
+Constrained MVO & 29.7 & 0.064593 & 23.64% & 0.0709% \\
+Unconstrained MVO & 29.4 & 0.067639 & 23.64% & 0.0709% \\
+1/N (~867 stocks) & 867.4 & 0.001179 & 4.67% & 0.0140% \\
+\bottomrule
+\end{tabular}
+\end{table}

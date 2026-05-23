@@ -1,0 +1,12 @@
+{
+  "best_net_sharpe_tuning": 1.55875,
+  "pc": 0.6054,
+  "pm": 0.137,
+  "sigma_m": 0.1469,
+  "lambda_": 1.8437,
+  "tuning_period_start": "2005-01-01",
+  "tuning_period_end": "2012-12-01",
+  "n_trials": 15,
+  "n_runs_per_trial": 3,
+  "n_gens_per_trial": 30
+}

@@ -1,0 +1,10 @@
+==================================================
+GA Cardinality K — Behaviour Summary
+==================================================
+  Mean      : 14.41
+  Std       : 3.91
+  Min       : 10
+  Max       : 26
+  Median    : 14.0
+  % at K=10 : 20.6%  (lower bound binding)
+  % at K=30 : 0.0%  (upper bound binding)

@@ -25,7 +25,7 @@ Constrained and unconstrained MVO perform near-identically (Sharpe 0.557 vs 0.56
 
 Mean-variance optimization breaks down when the estimation window is short relative to the number of assets. With T = 60 months and N around 867 stocks, the sample covariance matrix is nearly singular (rank at most 59 in an 867x867 matrix). The question is whether an evolutionary algorithm that directly constrains portfolio size, weight concentration, and turnover can produce better out-of-sample results than MVO and naive diversification.
 
-The GA selects K in [10, 30] stocks each period and optimises a Sharpe-minus-turnover fitness function with Optuna-tuned parameters, evaluated over 20 years of rolling monthly returns. Against the same universe and cost model it achieves a net Sharpe of 0.2355, below all three benchmarks. The main finding is not that GAs are poor portfolio optimizers, but that λ is a critical design parameter. With λ = 1.8437 selected over 15 Optuna trials on a 96-period tuning window, the search traded off too much return for turnover stability.
+The GA selects K in [10, 30] stocks each period and optimises a Sharpe-minus-turnover fitness function with Optuna-tuned parameters, evaluated over 252 monthly out-of-sample periods (January 2005 to December 2025). Against the same universe and cost model it achieves a net Sharpe of 0.2355, below all three benchmarks. The main finding is not that GAs are poor portfolio optimizers, but that λ is a critical design parameter. With λ = 1.8437 selected over 15 Optuna trials on a 96-period tuning window, the search traded off too much return for turnover stability.
 
 ## Figures
 
@@ -137,7 +137,7 @@ ga-portfolio-optimization/
 
 **Hyperparameter tuning**
 - Optuna TPE sampler, 15 trials, tuning period 2005 to 2012 (96 periods)
-- Reduced settings per trial: 5 runs, 100 generations (vs 8 runs and 200 generations in main evaluation)
+- Reduced settings per trial: 3 runs, 30 generations (vs 8 runs and 200 generations in main evaluation)
 - Tuned parameters fixed for the full 2005 to 2025 evaluation
 
 ## Installation

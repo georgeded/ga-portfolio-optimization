@@ -1,0 +1,3 @@
+lambda,n_periods,sharpe_net,ann_return_net,ann_vol,avg_turnover,max_drawdown
+0.0  (ablation),20,0.2364,4.32%,18.28%,35.21%,-20.42%
+1.8437 (tuned),20,0.7933,10.87%,13.64%,25.22%,-9.87%

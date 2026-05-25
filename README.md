@@ -13,7 +13,7 @@ BSc CS thesis project at VU Amsterdam. A genetic algorithm for cardinality-const
 
 Evaluation: January 2005 to December 2025, 252 monthly out-of-sample periods. All metrics are on net excess returns after transaction costs. Annualized return = mean monthly × 12; annualized vol = monthly std × √12; Sharpe = annualized return / annualized vol. Constrained MVO caps individual weights at 0.15.
 
-The GA underperforms all three benchmarks. The Optuna-tuned penalty (λ = 1.8437) kept turnover low but at the cost of return-seeking behaviour: at average monthly turnover of ~21%, the penalty subtracts roughly 0.39 Sharpe units per period, pulling the fitness function away from high-return portfolios. The GA converged toward low-turnover solutions rather than high-return ones.
+The GA underperforms all three benchmarks. The ablation (see below) rules out the turnover penalty as the cause; removing it collapses performance further. The underperformance is more likely driven by in-sample fitness noise: with N/T ≈ 14.5, the Sharpe ratio estimated from the rank-deficient covariance matrix is a poor proxy for out-of-sample returns.
 
 Constrained and unconstrained MVO are nearly identical (Sharpe 0.5572 vs 0.5605). The 0.15 weight cap rarely binds when N ≈ 867, consistent with Jagannathan and Ma (2003).
 
@@ -56,7 +56,7 @@ The turnover penalty was tested against λ = 0 (no penalty) over 20 out-of-sampl
 | 0.0 (no penalty) | 0.0366 | 0.50% | 13.69% | 35.72% |
 | 1.8437 (tuned) | 0.7933 | 10.87% | 13.64% | 25.22% |
 
-Without the penalty, the GA turns over 35.7% per month; transaction costs consume almost all returns and Sharpe collapses to 0.04. The penalty is necessary - not the cause of underperformance relative to MVO. Removing it makes things substantially worse. The gap between GA and MVO is a fitness-function design issue, not a penalty artifact: λ = 1.8437 keeps costs under control but tips the fitness function too far toward turnover minimization at the expense of returns.
+Without the penalty, the GA turns over 35.7% per month; transaction costs consume almost all returns and Sharpe collapses to 0.04. The penalty is necessary. It is not the cause of underperformance relative to MVO. Removing it makes things substantially worse. The gap between GA and MVO is more likely caused by the poor quality of the in-sample fitness signal at this universe size, not by the penalty itself.
 
 ## Repository Structure
 
@@ -142,12 +142,12 @@ ga-portfolio-optimization/
 
 **Hyperparameter tuning**
 - Optuna TPE sampler, 15 trials, tuning period 2005 to 2012 (96 periods)
-- Reduced settings per trial: 3 runs, 30 generations (vs 8 runs and 200 generations in main evaluation)
+- Reduced settings per trial: 5 runs, 100 generations (vs 8 runs and 200 generations in main evaluation)
 - Tuned parameters fixed for the full 2005 to 2025 evaluation
 
 ## Reproduction
 
-Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription - download the monthly stock file (CIZ format, 2000 to 2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
+Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription. Download the monthly stock file (CIZ format, 2000 to 2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
 
 **1. Data loading**
 
@@ -175,7 +175,7 @@ python3 -m src.benchmarks.mvo
 python3 -m src.benchmarks.equal_weight
 ```
 
-**5. Optuna tuning** *(optional — pre-tuned values are already in `genetic_algorithm.py`)*
+**5. Optuna tuning** *(optional, pre-tuned values are already in `genetic_algorithm.py`)*
 
 ```bash
 python3 -m src.optimization.optuna_tuner

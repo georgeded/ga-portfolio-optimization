@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
 """
-Runs GA with lambda=0 on all 252 consecutive monthly periods, recording
-only the 20 evenly-spaced sampled dates, then compares against the tuned
-lambda=1.8437 results from the main evaluation.
+Lambda=0 ablation.
 
-The key fix over the original ablation: instead of jumping ~13 months
-between sampled periods and carrying stale prev_weights, we run the full
-252-period chain at lambda=0.  The 232 intermediate (non-sampled) periods
-use minimal GA settings (1 run, 10 gens) only to keep the weight chain
-fresh; their metrics are discarded.  The 20 reported periods use the same
-reduced-but-real settings as before (5 runs, 100 gens).  This gives
-lambda=0 exactly 1-month-old prev_weights at every sampled date — the same
-condition that lambda=1.84 had in the main evaluation — making the
-comparison a true ceteris-paribus test of the penalty coefficient.
+Need to run through every month so prev_weights do not go stale between the
+20 sampled dates. The in-between months use cheap GA settings and are not
+saved.
 
 Runtime estimate: ~2–3 hours on c2-standard-16.
 
@@ -69,16 +61,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def run_period(t, apply_date, universe, returns, prev_weights, prev_permnos, lam, pool,
                n_runs=N_RUNS, n_gens=N_GENS):
     """
-    Run one rebalancing period and return (result_dict, drifted_weights, permnos).
-
-    Parameters
-    ----------
-    n_runs : int
-        Number of independent GA runs.  Use N_RUNS for reported periods,
-        N_RUNS_WARMUP for intermediate chain periods.
-    n_gens : int
-        Number of GA generations.  Use N_GENS for reported periods,
-        N_GENS_WARMUP for intermediate chain periods.
+    Run one month, then pass the drifted weights on to the next month.
     """
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
@@ -95,7 +78,7 @@ def run_period(t, apply_date, universe, returns, prev_weights, prev_permnos, lam
         else None
     )
 
-    # Temporarily swap lambda/n_gens so run_ga uses the caller's values
+    # run_ga_with_affinity reads these globals, so swap them just for this call.
     orig_lambda, orig_ngens = ga_module.LAMBDA, ga_module.N_GENS
     ga_module.LAMBDA = lam
     ga_module.N_GENS = n_gens
@@ -109,7 +92,7 @@ def run_period(t, apply_date, universe, returns, prev_weights, prev_permnos, lam
         ga_module.LAMBDA = orig_lambda
         ga_module.N_GENS = orig_ngens
 
-    # Pick the run closest to the median fitness
+    # Same median-run choice used elsewhere.
     fitnesses = np.array([ga_fitness(w, mu, sigma, pw_aligned, lam) for w in all_weights])
     canon_w   = all_weights[int(np.argmin(np.abs(fitnesses - np.median(fitnesses))))]
 
@@ -175,7 +158,7 @@ def save_table_png(summary, path):
     t.set_fontsize(12)
     t.scale(1, 2.0)
 
-    # Bold header row
+    # Make the header stand out.
     for col in range(len(hdrs)):
         t[0, col].set_text_props(fontweight="bold")
 
@@ -195,16 +178,14 @@ def main():
     rebalance_dates   = sorted(universe["date"].unique())
     all_return_dates  = sorted(returns["date"].unique())
 
-    # ── Determine the 20 sampled dates (same as original ablation) ────────────
+    # Same sampled dates as before.
     indices       = np.linspace(0, len(rebalance_dates) - 1, N_PERIODS, dtype=int)
     sampled_dates = {rebalance_dates[i] for i in indices}
     first, last   = min(sampled_dates), max(sampled_dates)
     print(f"Sampled date range : {first.date()} → {last.date()}")
     print(f"Total chain periods: {len(rebalance_dates)}\n")
 
-    # ── Run ALL 252 periods at λ=0; record only the sampled ones ─────────────
-    # This ensures prev_weights are always 1-month-old at every sampled date,
-    # exactly matching the condition under which λ=1.84 was evaluated.
+    # Still run the skipped months, otherwise prev_weights get old.
     t0           = time.time()
     results_lam0 = []
     prev_weights = None
@@ -225,7 +206,7 @@ def main():
                 prev_weights, prev_permnos, LAMBDA_ABLATION, pool,
                 n_runs=n_runs_use, n_gens=n_gens_use,
             )
-            # Only keep results for the 20 reported sampled dates
+            # Only the sampled months go into the table.
             if is_sampled and result is not None:
                 results_lam0.append(result)
 

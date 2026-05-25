@@ -56,7 +56,7 @@ The turnover penalty was tested against λ = 0 (no penalty) over 20 out-of-sampl
 | 0.0 (no penalty) | 0.0366 | 0.50% | 13.69% | 35.72% |
 | 1.8437 (tuned) | 0.7933 | 10.87% | 13.64% | 25.22% |
 
-Without the penalty, the GA turns over 35.7% per month; transaction costs consume almost all returns and Sharpe collapses to 0.04. The penalty is necessary — not the cause of underperformance relative to MVO. Removing it makes things substantially worse. The gap between GA and MVO is a fitness-function design issue, not a penalty artifact: λ = 1.8437 keeps costs under control but tips the fitness function too far toward turnover minimization at the expense of returns.
+Without the penalty, the GA turns over 35.7% per month; transaction costs consume almost all returns and Sharpe collapses to 0.04. The penalty is necessary - not the cause of underperformance relative to MVO. Removing it makes things substantially worse. The gap between GA and MVO is a fitness-function design issue, not a penalty artifact: λ = 1.8437 keeps costs under control but tips the fitness function too far toward turnover minimization at the expense of returns.
 
 ## Repository Structure
 
@@ -147,7 +147,7 @@ ga-portfolio-optimization/
 
 ## Reproduction
 
-Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription — download the monthly stock file (CIZ format, 2000 to 2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
+Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription - download the monthly stock file (CIZ format, 2000 to 2025) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
 
 **1. Data loading**
 

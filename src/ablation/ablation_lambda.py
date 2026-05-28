@@ -79,7 +79,7 @@ def main():
         df_lam0 = run(
             lambda_val=0.0,
             output_path=lam0_path,
-            clear_checkpoint=False,
+            clear_checkpoint=True,  # avoid resuming main-GA checkpoint with wrong lambda
         )
 
     print("Loading main GA results ...")

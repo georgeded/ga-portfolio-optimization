@@ -49,7 +49,7 @@ The adaptive GA ends up using K around 16 on average, closer to the lower end of
 <summary>More figures</summary>
 
 ![Monthly portfolio turnover](results/figures/F3_turnover.png)
-*Monthly portfolio turnover. GA turnover (22.2%) is slightly above MVO (17.1%) in v2.*
+*Monthly portfolio turnover. GA turnover (22.2%) is slightly above MVO (17.1%).*
 
 ![HHI concentration](results/figures/F4_hhi.png)
 *HHI concentration over time. GA is more concentrated by construction (avg K around 16). Theoretical minimum: GA 1/16 = 0.063, MVO 1/62 = 0.016 (observed HHI: 0.034, approximately 62 stocks held on average), 1/N 1/867 = 0.001.*

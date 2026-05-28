@@ -151,6 +151,35 @@ def test_get_estimation_window_excludes_application_month():
                                err_msg="application-month return leaked into estimation window")
 
 
+def test_get_estimation_window_excludes_data_older_than_60_months():
+    """The window starts 60 months before the rebalance date, so t-61 data is excluded.
+    Put an extreme return at t-61 and zeros in t-60 to t-1; if the old data leaked
+    in, mu would be noticeably non-zero.
+    """
+    # t-61: one month before the window opens
+    old_date = pd.Timestamp("1999-12-31")
+    window_dates = pd.date_range("2000-01-31", periods=60, freq="ME")  # Jan 2000 - Dec 2004
+
+    rows = []
+    # extreme return at t-61
+    rows.append({"date": old_date, "permno": 1, "excess_ret": 0.5})
+    rows.append({"date": old_date, "permno": 2, "excess_ret": -0.5})
+    # zeros in the actual window
+    for date in window_dates:
+        rows.append({"date": date, "permno": 1, "excess_ret": 0.0})
+        rows.append({"date": date, "permno": 2, "excess_ret": 0.0})
+    returns = pd.DataFrame(rows)
+
+    mu, sigma, valid_permnos = get_estimation_window(
+        returns, [1, 2], pd.Timestamp("2005-01-01")
+    )
+
+    assert valid_permnos == [1, 2]
+    # Window contains only zeros; t-61 must not have been included
+    np.testing.assert_allclose(mu, [0.0, 0.0], atol=1e-10,
+                               err_msg="data older than 60 months leaked into estimation window")
+
+
 # ---------------------------------------------------------------------------
 # optimize_mvo fallback
 # ---------------------------------------------------------------------------

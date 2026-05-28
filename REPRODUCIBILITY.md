@@ -10,7 +10,7 @@ The result figures and summary tables committed to `results/` were produced from
 
 Place these two files in `data/raw/` before running anything:
 
-- `crsp_returns.csv` - CRSP monthly stock file (CIZ format, 2000–2025). Source: WRDS -> CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
+- `crsp_returns.csv` - CRSP monthly stock file (CIZ format, 2000–2025). Source: WRDS, under CRSP Annual Update / Stock Version 2 (CIZ) / Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
 - `risk_free_rate.csv` - FRED DTB3 series (3-month T-bill, annual %). Download from FRED and save as-is.
 
 ## Full reproduction order

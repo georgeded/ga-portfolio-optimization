@@ -36,25 +36,6 @@ def compute_drift_weights(weights: np.ndarray, stock_returns: np.ndarray) -> np.
     return drifted / total
 
 
-# Kept for reference; the main experiment uses the full eligible universe
-def cap_universe(universe: pd.DataFrame, returns: pd.DataFrame, top_n: int = 200) -> pd.DataFrame:
-    returns = returns.copy()
-    returns["mktcap"] = returns["prc"].abs() * returns["shrout"] * 1000
-
-    result_rows = []
-    for date, group in universe.groupby("date"):
-        permnos = group["permno"].tolist()
-        date_ret = returns[
-            (returns["date"].dt.year == date.year) &
-            (returns["date"].dt.month == date.month) &
-            (returns["permno"].isin(permnos))
-        ][["permno", "mktcap"]].drop_duplicates("permno")
-
-        top = date_ret.nlargest(top_n, "mktcap")["permno"].tolist()
-        for p in top:
-            result_rows.append({"date": date, "permno": p})
-
-    return pd.DataFrame(result_rows)
 
 
 def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_permnos: list) -> np.ndarray:

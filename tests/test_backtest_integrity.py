@@ -12,9 +12,7 @@ from src.utils.portfolio import (
 )
 
 
-# ---------------------------------------------------------------------------
 # compute_drift_weights
-# ---------------------------------------------------------------------------
 
 def test_compute_drift_weights_total_loss_falls_back_to_equal_weight():
     """When the whole portfolio goes to zero, drift weights should fall back to equal weight."""
@@ -37,9 +35,7 @@ def test_compute_drift_weights_sums_to_one():
                                    err_msg="drifted weights do not sum to 1")
 
 
-# ---------------------------------------------------------------------------
 # align_drifted_weights
-# ---------------------------------------------------------------------------
 
 def test_align_drifted_weights_all_previous_holdings_leave_universe():
     """When all previous holdings leave the universe, the result should be equal weight over the new universe."""
@@ -52,9 +48,7 @@ def test_align_drifted_weights_all_previous_holdings_leave_universe():
     np.testing.assert_allclose(result, np.full(4, 0.25), atol=1e-10)
 
 
-# ---------------------------------------------------------------------------
 # portfolio_turnover
-# ---------------------------------------------------------------------------
 
 def test_portfolio_turnover_exiting_positions():
     """An asset held at 0.5 that exits completely contributes 0.5 to the
@@ -68,9 +62,7 @@ def test_portfolio_turnover_exiting_positions():
     np.testing.assert_allclose(result, 0.5, atol=1e-10)
 
 
-# ---------------------------------------------------------------------------
 # build_monthly_universe
-# ---------------------------------------------------------------------------
 
 def test_build_monthly_universe_requires_market_cap_and_full_history():
     """Eligible stocks must have market cap >= 2B and a complete 60-month return history."""
@@ -92,9 +84,7 @@ def test_build_monthly_universe_requires_market_cap_and_full_history():
     assert result.tolist() == [1]
 
 
-# ---------------------------------------------------------------------------
 # get_estimation_window
-# ---------------------------------------------------------------------------
 
 def test_get_estimation_window_returns_mu_sigma_and_valid_permnos():
     """Verifies mu and sigma are computed from the complete 60-month return matrix.
@@ -180,9 +170,7 @@ def test_get_estimation_window_excludes_data_older_than_60_months():
                                err_msg="data older than 60 months leaked into estimation window")
 
 
-# ---------------------------------------------------------------------------
 # optimize_mvo fallback
-# ---------------------------------------------------------------------------
 
 def test_optimize_mvo_solver_failure_falls_back_to_equal_weight(monkeypatch):
     """Verifies optimizer failure returns equal weights, computed as 1/N after the fallback path."""

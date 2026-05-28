@@ -1,5 +1,0 @@
-,Avg Portfolio Size (K),Avg HHI,Avg Monthly Turnover,Avg Transaction Cost
-GA (adaptive K),14.4,0.095700,21.34%,0.0640%
-Constrained MVO,29.7,0.064593,23.64%,0.0709%
-Unconstrained MVO,29.4,0.067639,23.64%,0.0709%
-1/N (~867 stocks),867.4,0.001179,4.67%,0.0140%

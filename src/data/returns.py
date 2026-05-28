@@ -35,7 +35,7 @@ def load_rf(path: str = "data/processed/risk_free_rate.parquet") -> pd.DataFrame
 def compute_excess_returns(universe: pd.DataFrame, crsp: pd.DataFrame, rf: pd.DataFrame) -> pd.DataFrame:
     """
     CRSP dates are end-of-month (e.g. 2005-01-31); FRED dates are start-of-month.
-    Matched on year-month period — same calendar month, different day convention.
+    Matched on year-month period, same calendar month, different day convention.
     """
     crsp = crsp.copy()
     crsp["year_month"] = crsp["date"].dt.to_period("M")

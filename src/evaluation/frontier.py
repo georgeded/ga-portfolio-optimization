@@ -2,7 +2,7 @@
 Figure 6 - Mean-Variance Efficient Frontier at representative dates.
 For each of 3 dates, traces the frontier and overlays actual GA, MVO, and 1/N positions.
 GA uses N_GENS_FRONTIER=50 (illustrative only; main experiment used 200).
-All positions use in-sample μ/Σ - not out-of-sample performance.
+All positions use in-sample mu/sigma - not out-of-sample performance.
 """
 
 import numpy as np
@@ -28,7 +28,7 @@ DATE_LABELS = ["Pre-crisis (Jan 2007)",
                "Recent (Jan 2020)"]
 
 N_FRONTIER_POINTS = 30    # 30 points sufficient for smooth curve
-N_GENS_FRONTIER = 50      # reduced from 200 — illustrative only
+N_GENS_FRONTIER = 50      # reduced from 200, illustrative only
 BASE_SEED = 42
 OUT_DIR = "results/figures"
 
@@ -118,8 +118,8 @@ def get_portfolio_weights(mu: np.ndarray, sigma: np.ndarray, n_assets: int) -> d
     """
     rng = np.random.default_rng(BASE_SEED)
 
-    # GA — reduced generations for speed, not the main experiment result
-    print("    Running GA (50 gens — illustrative)...")
+    # GA, reduced generations for speed, not the main experiment result
+    print("    Running GA (50 gens, illustrative)...")
     orig_n_gens = ga_module.N_GENS
     ga_module.N_GENS = N_GENS_FRONTIER
     try:
@@ -191,7 +191,7 @@ def run_frontier() -> None:
         if len(vols_con) > 1:
             ax.plot(vols_con * 100, rets_con * 100,
                     color="#666666", lw=1.5, ls="--",
-                    label=f"Frontier (w ≤ {W_MAX_CONSTRAINED:.2f})", zorder=2)
+                    label=f"Frontier (w <= {W_MAX_CONSTRAINED:.2f})", zorder=2)
 
         print("  Computing portfolio positions...")
         weights = get_portfolio_weights(mu, sigma, n_assets)
@@ -221,7 +221,7 @@ def run_frontier() -> None:
         mlines.Line2D([], [], color="#000000", ls="-",
                       label="Frontier (unconstrained)"),
         mlines.Line2D([], [], color="#666666", ls="--",
-                      label="Frontier (w ≤ 0.15)"),
+                      label="Frontier (w <= 0.15)"),
     ]
     for name, s in PORTFOLIO_STYLES.items():
         handles.append(plt.scatter([], [],

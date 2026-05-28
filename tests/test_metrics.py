@@ -144,14 +144,14 @@ def test_max_drawdown_negative():
 
 def test_cumulative_returns_known():
     excess = np.array([0.05])
-    rf     = np.array([0.01])
+    rf = np.array([0.01])
     result = compute_cumulative_returns(excess, rf)
     assert abs(result[0] - 1.06) < 1e-10
 
 
 def test_cumulative_returns_compounding():
     excess = np.array([0.07, 0.07])
-    rf     = np.array([0.03, 0.03])
+    rf = np.array([0.03, 0.03])
     result = compute_cumulative_returns(excess, rf)
     assert abs(result[0] - 1.10) < 1e-10
     assert abs(result[1] - 1.21) < 1e-10
@@ -159,7 +159,7 @@ def test_cumulative_returns_compounding():
 
 def test_cumulative_returns_always_positive():
     excess = np.tile([0.01, -0.005], 30)
-    rf     = np.full(60, 0.003)
+    rf = np.full(60, 0.003)
     result = compute_cumulative_returns(excess, rf)
     assert (result > 0).all()
 
@@ -184,7 +184,7 @@ def test_turnover_known():
 
 
 def test_turnover_between_zero_and_one():
-    rng   = np.random.default_rng(42)
+    rng = np.random.default_rng(42)
     w_new = rng.dirichlet(np.ones(10))
     w_old = rng.dirichlet(np.ones(10))
     result = portfolio_turnover(w_new, w_old)
@@ -227,22 +227,22 @@ def test_hhi_single_stock():
 def test_hhi_minimum_for_n_stocks():
     n = 20
     w_equal = np.full(n, 1/n)
-    rng     = np.random.default_rng(42)
+    rng = np.random.default_rng(42)
     w_random = rng.dirichlet(np.ones(n))
     assert herfindahl_index(w_equal) <= herfindahl_index(w_random)
 
 
 def test_hhi_between_zero_and_one():
     rng = np.random.default_rng(42)
-    w   = rng.dirichlet(np.ones(10))
+    w = rng.dirichlet(np.ones(10))
     result = herfindahl_index(w)
     assert 0.0 <= result <= 1.0
 
 
 def test_compute_all_metrics_keys():
-    rng       = np.random.default_rng(42)
-    excess    = rng.normal(0.008, 0.05, 60)
-    rf        = np.full(60, 0.003)
+    rng = np.random.default_rng(42)
+    excess = rng.normal(0.008, 0.05, 60)
+    rf = np.full(60, 0.003)
     turnovers = np.full(60, 0.1)
 
     metrics = compute_all_metrics(excess, rf, turnovers)
@@ -259,9 +259,9 @@ def test_compute_all_metrics_keys():
 
 
 def test_compute_all_metrics_net_less_than_gross():
-    rng       = np.random.default_rng(42)
-    excess    = rng.normal(0.008, 0.05, 60)
-    rf        = np.full(60, 0.003)
+    rng = np.random.default_rng(42)
+    excess = rng.normal(0.008, 0.05, 60)
+    rf = np.full(60, 0.003)
     turnovers = np.full(60, 0.1)
 
     metrics = compute_all_metrics(excess, rf, turnovers)
@@ -269,9 +269,9 @@ def test_compute_all_metrics_net_less_than_gross():
 
 
 def test_compute_all_metrics_zero_turnover_equals_gross():
-    rng       = np.random.default_rng(42)
-    excess    = rng.normal(0.008, 0.05, 60)
-    rf        = np.full(60, 0.003)
+    rng = np.random.default_rng(42)
+    excess = rng.normal(0.008, 0.05, 60)
+    rf = np.full(60, 0.003)
     turnovers = np.zeros(60)
 
     metrics = compute_all_metrics(excess, rf, turnovers)
@@ -279,9 +279,9 @@ def test_compute_all_metrics_zero_turnover_equals_gross():
 
 
 def test_compute_all_metrics_no_nan():
-    rng       = np.random.default_rng(42)
-    excess    = rng.normal(0.008, 0.05, 60)
-    rf        = np.full(60, 0.003)
+    rng = np.random.default_rng(42)
+    excess = rng.normal(0.008, 0.05, 60)
+    rf = np.full(60, 0.003)
     turnovers = np.full(60, 0.05)
 
     metrics = compute_all_metrics(excess, rf, turnovers)

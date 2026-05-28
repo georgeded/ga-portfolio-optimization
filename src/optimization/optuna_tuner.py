@@ -21,6 +21,9 @@ import optuna
 import pandas as pd
 from tqdm import tqdm
 
+import logging
+logging.getLogger("optuna").setLevel(logging.ERROR)
+
 import src.optimization.genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga, fitness as ga_fitness
 from src.evaluation.metrics import (
@@ -38,27 +41,27 @@ from src.utils.portfolio import (
     align_drifted_weights,
 )
 
-TUNE_START  = "2005-01-01"
-TUNE_END    = "2012-12-01"   # inclusive — 96 periods
-N_TRIALS    = 15
-N_RUNS_TUNE = 5              # fewer runs than full experiment to keep trials fast
-N_GENS_TUNE = 100            # fewer gens than full experiment
-BASE_SEED   = 2000           # different from runner.py (1000) to avoid overlap
-OUTPUT_DIR  = "results/optuna"
-STUDY_DB    = os.path.join(OUTPUT_DIR, "study.db")
+TUNE_START = "2005-01-01"
+TUNE_END = "2012-12-01"  # inclusive, 96 periods
+N_TRIALS = 15
+N_RUNS_TUNE = 3  # fewer runs than full experiment to keep trials fast
+N_GENS_TUNE = 30  # fewer gens than full experiment
+BASE_SEED = 2000  # different from runner.py seed (1000) to avoid overlap
+OUTPUT_DIR = "results/optuna"
+STUDY_DB = os.path.join(OUTPUT_DIR, "study.db")
 BEST_PARAMS = os.path.join(OUTPUT_DIR, "best_params.json")
 
 
 # module-level for pickling
 def _run_single(args: tuple) -> np.ndarray:
-    """Run one GA instance with trial-specific hyperparameters."""
+    """Run one GA trial with the given params."""
     n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_ = args
 
-    ga_module.N_GENS  = n_gens
-    ga_module.PC      = pc
-    ga_module.PM      = pm
+    ga_module.N_GENS = n_gens
+    ga_module.PC = pc
+    ga_module.PM = pm
     ga_module.SIGMA_M = sigma_m
-    ga_module.LAMBDA  = lambda_
+    ga_module.LAMBDA = lambda_
 
     rng = np.random.default_rng(seed)
     return run_ga(n_assets, mu, sigma, prev_weights, rng)
@@ -92,8 +95,16 @@ def _eval_period(
     n_assets = len(valid_permnos)
 
     if prev_weights is not None and prev_permnos is not None:
-        pw_aligned = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
+        pw_raw = (pd.Series(prev_weights, index=prev_permnos)
+                  .reindex(valid_permnos, fill_value=0.0)
+                  .values)
+        raw_total = pw_raw.sum()
+        if raw_total > 0:
+            pw_aligned = pw_raw / raw_total
+        else:
+            pw_aligned = np.ones(len(valid_permnos)) / len(valid_permnos)
     else:
+        pw_raw = None
         pw_aligned = None
 
     worker_args = [
@@ -121,8 +132,8 @@ def _eval_period(
     portfolio_gross = canon_gross
     portfolio_excess = portfolio_gross - rf
     turnover = (
-        portfolio_turnover(canon_w, pw_aligned)
-        if pw_aligned is not None else 1.0
+        portfolio_turnover(canon_w, pw_raw)
+        if pw_raw is not None else 1.0
     )
     cost = transaction_cost(turnover, gamma)
 
@@ -147,10 +158,10 @@ def _make_objective(
     n_workers: int,
     gamma: float,
 ):
-    """Pool created once per trial to avoid 96 spawn/kill cycles."""
+    """One pool per trial, reused across all periods."""
     def objective(trial: optuna.Trial) -> float:
-        pc      = trial.suggest_float("pc",      0.60, 0.95)
-        pm      = trial.suggest_float("pm",      0.01, 0.30)
+        pc = trial.suggest_float("pc", 0.60, 0.95)
+        pm = trial.suggest_float("pm", 0.01, 0.30)
         sigma_m = trial.suggest_float("sigma_m", 0.01, 0.15)
         lambda_ = trial.suggest_float("lambda_", 0.00, 2.00)
 
@@ -197,6 +208,130 @@ def _make_objective(
     return objective
 
 
+def tune_for_period(
+    returns: pd.DataFrame,
+    universe: pd.DataFrame,
+    tuning_dates: list,
+    warm_start_params: dict | None = None,
+    n_trials: int = 5,
+    n_gens: int = N_GENS_TUNE,
+    gamma: float = TRANSACTION_COST,
+) -> dict:
+    """Tune GA hyperparameters on the rolling window before the current period.
+    Walk-forward tuning so params are always tuned on past data only.
+    warm_start_params seeds the first trial with the previous period's best.
+    """
+    if len(tuning_dates) < 12:
+        # not enough history to tune, return defaults rather than garbage params
+        return {
+            "pc":      ga_module.PC,
+            "pm":      ga_module.PM,
+            "sigma_m": ga_module.SIGMA_M,
+            "lambda_": ga_module.LAMBDA,
+        }
+
+    all_return_dates = sorted(returns["date"].unique())
+
+    def objective(trial: optuna.Trial) -> float:
+        pc = trial.suggest_float("pc", 0.60, 0.95)
+        pm = trial.suggest_float("pm", 0.01, 0.30)
+        sigma_m = trial.suggest_float("sigma_m", 0.01, 0.15)
+        lambda_ = trial.suggest_float("lambda_", 0.00, 2.00)
+
+        excess_rets = []
+        turnovers_arr = []
+        prev_weights = None
+        prev_permnos = None
+
+        # sequential evaluation, no pool to avoid nesting under runner's pool
+        for t in tuning_dates:
+            apply_dates = [
+                d for d in all_return_dates
+                if d.year == t.year and d.month == t.month
+            ]
+            if not apply_dates:
+                continue
+
+            eligible = universe[universe["date"] == t]["permno"].tolist()
+            if not eligible:
+                continue
+
+            mu, sigma, valid_permnos = get_estimation_window(returns, eligible, t)
+            if mu is None or len(valid_permnos) < 2:
+                continue
+
+            n_assets = len(valid_permnos)
+            if prev_weights is not None and prev_permnos is not None:
+                # pw_raw for turnover, unrenormalized so exit cost is included naturally
+                # pw_aligned for GA prev_weights (renormalized to sum to 1)
+                pw_raw = (pd.Series(prev_weights, index=prev_permnos)
+                          .reindex(valid_permnos, fill_value=0.0)
+                          .values)
+                raw_total = pw_raw.sum()
+                if raw_total > 0:
+                    pw_aligned = pw_raw / raw_total
+                else:
+                    pw_aligned = np.ones(len(valid_permnos)) / len(valid_permnos)
+            else:
+                pw_raw = None
+                pw_aligned = None
+
+            # one GA run per period keeps tuning fast enough to run every month
+            ga_module.N_GENS = n_gens
+            ga_module.PC = pc
+            ga_module.PM = pm
+            ga_module.SIGMA_M = sigma_m
+            ga_module.LAMBDA = lambda_
+            rng = np.random.default_rng(BASE_SEED)
+            w = run_ga(n_assets, mu, sigma, pw_aligned, rng)
+
+            apply_date = apply_dates[0]
+            month_ret = get_monthly_returns(returns, valid_permnos, apply_date)
+            stock_rets = month_ret.values
+            rf = get_rf_for_month(returns, apply_date)
+
+            excess_ret = float(w @ stock_rets) - rf
+            turnover = (
+                portfolio_turnover(w, pw_raw)
+                if pw_raw is not None else 1.0
+            )
+            excess_rets.append(excess_ret)
+            turnovers_arr.append(turnover)
+
+            prev_weights = compute_drift_weights(w, stock_rets)
+            prev_permnos = valid_permnos
+
+        if len(excess_rets) < 12:
+            raise optuna.exceptions.TrialPruned()
+
+        excess_arr = np.array(excess_rets)
+        costs = np.array(turnovers_arr) * gamma
+        net_excess = excess_arr - costs
+        return sharpe_ratio(net_excess)
+
+    pruner = optuna.pruners.MedianPruner()
+    study = optuna.create_study(
+        direction="maximize",
+        sampler=optuna.samplers.TPESampler(seed=42),
+        pruner=pruner,
+    )
+
+    # enqueue warm-start so the first trial revisits last period's best params
+    if warm_start_params is not None:
+        study.enqueue_trial(warm_start_params)
+    else:
+        study.enqueue_trial({
+            "pc":      ga_module.PC,
+            "pm":      ga_module.PM,
+            "sigma_m": ga_module.SIGMA_M,
+            "lambda_": ga_module.LAMBDA,
+        })
+
+    study.optimize(objective, n_trials=n_trials)
+
+    return study.best_params
+
+
 def run_tuner(
     n_trials: int = N_TRIALS,
     n_runs: int = N_RUNS_TUNE,
@@ -228,8 +363,6 @@ def run_tuner(
     print(f"Storage       : {STUDY_DB}")
     print()
 
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
-
     study = optuna.create_study(
         study_name="ga_hyperparameter_tuning",
         direction="maximize",
@@ -242,7 +375,7 @@ def run_tuner(
     remaining = n_trials - already_done
 
     if remaining <= 0:
-        print(f"Study already has {already_done} trials — nothing to do.")
+        print(f"Study already has {already_done} trials, nothing to do.")
         print("Delete the study DB to restart: rm results/optuna/study.db")
     else:
         if already_done > 0:
@@ -282,8 +415,8 @@ def run_tuner(
 
     output = {
         "best_net_sharpe_tuning": round(best_value, 6),
-        "pc":                     round(best_params["pc"],      4),
-        "pm":                     round(best_params["pm"],      4),
+        "pc":                     round(best_params["pc"], 4),
+        "pm":                     round(best_params["pm"], 4),
         "sigma_m":                round(best_params["sigma_m"], 4),
         "lambda_":                round(best_params["lambda_"], 4),
         "tuning_period_start":    TUNE_START,
@@ -313,11 +446,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Debug mode: 5 trials, 3 runs, 30 gens, 12 periods",
     )
-    parser.add_argument("--n-trials",    type=int,   default=N_TRIALS)
-    parser.add_argument("--n-runs",      type=int,   default=N_RUNS_TUNE)
-    parser.add_argument("--n-gens",      type=int,   default=N_GENS_TUNE)
-    parser.add_argument("--max-periods", type=int,   default=None)
-    parser.add_argument("--gamma",       type=float, default=TRANSACTION_COST)
+    parser.add_argument("--n-trials", type=int, default=N_TRIALS)
+    parser.add_argument("--n-runs", type=int, default=N_RUNS_TUNE)
+    parser.add_argument("--n-gens", type=int, default=N_GENS_TUNE)
+    parser.add_argument("--max-periods", type=int, default=None)
+    parser.add_argument("--gamma", type=float, default=TRANSACTION_COST)
     args = parser.parse_args()
 
     if args.debug:

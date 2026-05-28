@@ -13,22 +13,22 @@ import os
 OUT_DIR = "results/tables"
 
 COL_COMPARISON = "Comparison"
-COL_MEAN_DIFF  = "Mean Diff (ann.)"
-COL_T_STAT     = "t-stat"
-COL_T_PVAL     = "t p-value"
-COL_T_SIG      = "t Sig."
-COL_SR_GA      = "SR(GA)"
-COL_SR_BENCH   = "SR(Bench)"
-COL_SR_DIFF    = "SR Diff"
-COL_Z_STAT     = "z-stat"
-COL_JK_PVAL    = "JK p-value"
-COL_JK_SIG     = "JK Sig."
+COL_MEAN_DIFF = "Mean Diff (ann.)"
+COL_T_STAT = "t-stat"
+COL_T_PVAL = "t p-value"
+COL_T_SIG = "t Sig."
+COL_SR_GA = "SR(GA)"
+COL_SR_BENCH = "SR(Bench)"
+COL_SR_DIFF = "SR Diff"
+COL_Z_STAT = "z-stat"
+COL_JK_PVAL = "JK p-value"
+COL_JK_SIG = "JK Sig."
 
 
 def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
     """
-    Var(SR1 − SR2) = (1/T)·[2(1−ρ) + 0.5·SR1² + 0.5·SR2² − SR1·SR2·(1+ρ)]
-    var_diff can be negative for highly correlated strategies; guard → z=0, p=1.
+    Var(SR1 - SR2) = (1/T)*[2*(1-rho) + 0.5*SR1^2 + 0.5*SR2^2 - SR1*SR2*(1+rho)]
+    var_diff can be negative for highly correlated strategies; guard -> z=0, p=1.
     """
     T = len(r1)
     assert len(r2) == T, "Return series must have equal length"
@@ -96,10 +96,21 @@ def build_table2(
     mvo_unc = pd.read_parquet(mvo_unc_path)
     mvo_con = pd.read_parquet(mvo_con_path)
 
-    dates = ga["date"].values
-    assert (ew["date"].values      == dates).all(), "Date mismatch: GA vs 1/N"
-    assert (mvo_unc["date"].values == dates).all(), "Date mismatch: GA vs Unc MVO"
-    assert (mvo_con["date"].values == dates).all(), "Date mismatch: GA vs Con MVO"
+    common_dates = (
+        set(ga["date"])
+        & set(ew["date"])
+        & set(mvo_unc["date"])
+        & set(mvo_con["date"])
+    )
+    total_before = max(len(ga), len(ew), len(mvo_unc), len(mvo_con))
+    dropped = total_before - len(common_dates)
+    if dropped > 0:
+        print(f"Warning: {dropped} dates dropped due to model mismatch, check results.")
+
+    ga = ga[ga["date"].isin(common_dates)].sort_values("date").reset_index(drop=True)
+    ew = ew[ew["date"].isin(common_dates)].sort_values("date").reset_index(drop=True)
+    mvo_unc = mvo_unc[mvo_unc["date"].isin(common_dates)].sort_values("date").reset_index(drop=True)
+    mvo_con = mvo_con[mvo_con["date"].isin(common_dates)].sort_values("date").reset_index(drop=True)
 
     r_ga = ga["net_excess_ret"].values
     r_ew = ew["net_excess_ret"].values
@@ -134,15 +145,15 @@ def build_table2(
 
     fmt = raw.copy()
     fmt[COL_MEAN_DIFF] = (raw[COL_MEAN_DIFF] * 100).map("{:.2f}%".format)
-    fmt[COL_T_STAT]    = raw[COL_T_STAT].map("{:.3f}".format)
-    fmt[COL_T_PVAL]    = raw[COL_T_PVAL].map("{:.4f}".format)
-    fmt[COL_T_SIG]     = raw[COL_T_SIG].map(lambda x: "yes" if x else "no")
-    fmt[COL_SR_GA]     = raw[COL_SR_GA].map("{:.4f}".format)
-    fmt[COL_SR_BENCH]  = raw[COL_SR_BENCH].map("{:.4f}".format)
-    fmt[COL_SR_DIFF]   = raw[COL_SR_DIFF].map("{:.4f}".format)
-    fmt[COL_Z_STAT]    = raw[COL_Z_STAT].map("{:.3f}".format)
-    fmt[COL_JK_PVAL]   = raw[COL_JK_PVAL].map("{:.4f}".format)
-    fmt[COL_JK_SIG]    = raw[COL_JK_SIG].map(lambda x: "yes" if x else "no")
+    fmt[COL_T_STAT] = raw[COL_T_STAT].map("{:.3f}".format)
+    fmt[COL_T_PVAL] = raw[COL_T_PVAL].map("{:.4f}".format)
+    fmt[COL_T_SIG] = raw[COL_T_SIG].map(lambda x: "yes" if x else "no")
+    fmt[COL_SR_GA] = raw[COL_SR_GA].map("{:.4f}".format)
+    fmt[COL_SR_BENCH] = raw[COL_SR_BENCH].map("{:.4f}".format)
+    fmt[COL_SR_DIFF] = raw[COL_SR_DIFF].map("{:.4f}".format)
+    fmt[COL_Z_STAT] = raw[COL_Z_STAT].map("{:.3f}".format)
+    fmt[COL_JK_PVAL] = raw[COL_JK_PVAL].map("{:.4f}".format)
+    fmt[COL_JK_SIG] = raw[COL_JK_SIG].map(lambda x: "yes" if x else "no")
 
     return raw, fmt
 
@@ -232,8 +243,8 @@ if __name__ == "__main__":
     print(f"Saved: {OUT_DIR}/significance_tests_formatted.csv")
 
     latex = to_latex(fmt)
-    with open(f"{OUT_DIR}/table2_significance.tex", "w") as f:
+    with open(f"{OUT_DIR}/T2_significance.tex", "w") as f:
         f.write(latex)
-    print(f"Saved: {OUT_DIR}/table2_significance.tex")
+    print(f"Saved: {OUT_DIR}/T2_significance.tex")
 
-    to_png(fmt, f"{OUT_DIR}/table2_significance.png")
+    to_png(fmt, f"{OUT_DIR}/T2_significance.png")

@@ -7,16 +7,16 @@ import numpy as np
 
 ANNUALIZATION_FACTOR = 12
 SQRT_12 = np.sqrt(ANNUALIZATION_FACTOR)
-TRANSACTION_COST = 0.003  # γ = 0.3%
+TRANSACTION_COST = 0.003  # gamma = 0.3%
 
 
 def annualized_return(excess_returns: np.ndarray) -> float:
-    """Annualized mean excess return (μ̄ × 12)."""
+    """Annualized mean excess return (mean * 12)."""
     return float(np.mean(excess_returns) * ANNUALIZATION_FACTOR)
 
 
 def annualized_volatility(excess_returns: np.ndarray) -> float:
-    """Annualized std of excess returns (ddof=1, × √12). Clamped to 0 against float noise."""
+    """Annualized std of excess returns (ddof=1, * sqrt(12)). Clamped to 0 against float noise."""
     vol = float(np.std(excess_returns, ddof=1) * SQRT_12)
     return max(vol, 0.0)
 
@@ -41,7 +41,7 @@ def sortino_ratio(excess_returns: np.ndarray) -> float:
 
 
 def max_drawdown(cumulative_returns: np.ndarray) -> float:
-    """Largest peak-to-trough loss. Returns negative fraction (e.g. −0.45 = −45%)."""
+    """Largest peak-to-trough loss. Returns negative fraction (e.g. -0.45 = -45%)."""
     peak = np.maximum.accumulate(cumulative_returns)
     drawdown = (cumulative_returns - peak) / peak
     return float(np.min(drawdown))
@@ -54,22 +54,22 @@ def compute_cumulative_returns(excess_returns: np.ndarray, rf: np.ndarray) -> np
 
 
 def portfolio_turnover(weights_current: np.ndarray, weights_previous: np.ndarray) -> float:
-    """Σ|w_t − w_{t-1}| / 2 where w_{t-1} is the post-drift weight before rebalancing."""
+    """sum(|w_t - w_{t-1}|) / 2 where w_{t-1} is the post-drift weight before rebalancing."""
     return float(np.sum(np.abs(weights_current - weights_previous)) / 2)
 
 
 def transaction_cost(turnover: float, gamma: float = TRANSACTION_COST) -> float:
-    """γ × turnover."""
+    """gamma * turnover."""
     return float(gamma * turnover)
 
 
 def net_return(gross_return: float, turnover: float, gamma: float = TRANSACTION_COST) -> float:
-    """gross_return − γ × turnover."""
+    """gross_return - gamma * turnover."""
     return gross_return - transaction_cost(turnover, gamma)
 
 
 def herfindahl_index(weights: np.ndarray) -> float:
-    """HHI = Σw_i². Range: [1/K, 1.0] for equal-weight to single-asset."""
+    """HHI = sum(w_i^2). Range: [1/K, 1.0] for equal-weight to single-asset."""
     return float(np.sum(weights ** 2))
 
 
@@ -94,7 +94,7 @@ def compute_all_metrics(
         "ann_vol": annualized_volatility(excess_returns),
         "max_drawdown_gross": max_drawdown(cumulative),
 
-        # net (after costs) — primary reported metrics
+        # net (after costs), primary reported metrics
         "sharpe_net": sharpe_ratio(net_excess),
         "sortino_net": sortino_ratio(net_excess),
         "ann_return_net": annualized_return(net_excess),

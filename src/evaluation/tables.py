@@ -12,13 +12,13 @@ SQRT_12 = np.sqrt(12)
 OUT_DIR = "results/tables"
 
 # Table 1
-COL_RETURN   = "Annualized Return (net)"
-COL_VOL      = "Annualized Volatility"
-COL_SHARPE   = "Sharpe Ratio (net)"
-COL_SORTINO  = "Sortino Ratio (net)"
-COL_MDD      = "Max Drawdown (net)"
+COL_RETURN = "Annualized Return (net)"
+COL_VOL = "Annualized Volatility"
+COL_SHARPE = "Sharpe Ratio (net)"
+COL_SORTINO = "Sortino Ratio (net)"
+COL_MDD = "Max Drawdown (net)"
 COL_TURNOVER = "Avg Monthly Turnover"
-COL_COST     = "Avg Transaction Cost"
+COL_COST = "Avg Transaction Cost"
 
 COLUMNS_T1 = [COL_RETURN, COL_VOL, COL_SHARPE, COL_SORTINO,
               COL_MDD, COL_TURNOVER, COL_COST]
@@ -34,9 +34,9 @@ COL_LATEX_T1 = {
 }
 
 # Table 3
-COL_K     = "Avg Portfolio Size (K)"
-COL_HHI   = "Avg HHI"
-COL_TO3   = "Avg Monthly Turnover"
+COL_K = "Avg Portfolio Size (K)"
+COL_HHI = "Avg HHI"
+COL_TO3 = "Avg Monthly Turnover"
 COL_COST3 = "Avg Transaction Cost"
 
 COLUMNS_T3 = [COL_K, COL_HHI, COL_TO3, COL_COST3]
@@ -86,23 +86,23 @@ def to_png(fmt: pd.DataFrame, path: str, fontsize: int = 10) -> None:
 def compute_table1_metrics(df: pd.DataFrame) -> dict:
     """Compute all Table 1 metrics for a single strategy."""
     net = df["net_excess_ret"].values
-    rf  = df["rf"].values
-    to  = df["turnover"].values
+    rf = df["rf"].values
+    to = df["turnover"].values
 
     ann_ret = float(np.mean(net) * 12)
     ann_vol = float(np.std(net, ddof=1) * SQRT_12)
-    sharpe  = ann_ret / ann_vol if ann_vol > 0 else 0.0
+    sharpe = ann_ret / ann_vol if ann_vol > 0 else 0.0
 
     downside = net[net < 0]
     if len(downside) > 0:
-        dd_vol  = float(np.sqrt(np.mean(downside ** 2)) * SQRT_12)
+        dd_vol = float(np.sqrt(np.mean(downside ** 2)) * SQRT_12)
         sortino = ann_ret / dd_vol if dd_vol > 0 else 0.0
     else:
         sortino = 0.0
 
-    cum  = np.cumprod(1 + net + rf)
+    cum = np.cumprod(1 + net + rf)
     peak = np.maximum.accumulate(cum)
-    mdd  = float(np.min((cum - peak) / peak))
+    mdd = float(np.min((cum - peak) / peak))
 
     return {
         COL_RETURN:   ann_ret,
@@ -140,20 +140,20 @@ def build_table1(
 
 def format_table1(table: pd.DataFrame) -> pd.DataFrame:
     fmt = table.copy()
-    fmt[COL_RETURN]   = (table[COL_RETURN]   * 100).map("{:.2f}%".format)
-    fmt[COL_VOL]      = (table[COL_VOL]       * 100).map("{:.2f}%".format)
-    fmt[COL_SHARPE]   =  table[COL_SHARPE].map("{:.4f}".format)
-    fmt[COL_SORTINO]  =  table[COL_SORTINO].map("{:.4f}".format)
-    fmt[COL_MDD]      = (table[COL_MDD]       * 100).map("{:.2f}%".format)
-    fmt[COL_TURNOVER] = (table[COL_TURNOVER]  * 100).map("{:.2f}%".format)
-    fmt[COL_COST]     = (table[COL_COST]      * 100).map("{:.4f}%".format)
+    fmt[COL_RETURN] = (table[COL_RETURN] * 100).map("{:.2f}%".format)
+    fmt[COL_VOL] = (table[COL_VOL] * 100).map("{:.2f}%".format)
+    fmt[COL_SHARPE] = table[COL_SHARPE].map("{:.4f}".format)
+    fmt[COL_SORTINO] = table[COL_SORTINO].map("{:.4f}".format)
+    fmt[COL_MDD] = (table[COL_MDD] * 100).map("{:.2f}%".format)
+    fmt[COL_TURNOVER] = (table[COL_TURNOVER] * 100).map("{:.2f}%".format)
+    fmt[COL_COST] = (table[COL_COST] * 100).map("{:.4f}%".format)
     return fmt
 
 
 def print_table1(fmt: pd.DataFrame) -> None:
     print("\nTable 1: Main performance comparison, net of transaction costs")
     print("Period: 2005-01-31 to 2025-12-31 | 252 monthly observations")
-    print("Transaction cost: γ = 0.3% per unit traded\n")
+    print("Transaction cost: gamma = 0.3% per unit traded\n")
     print(fmt.to_string())
 
 
@@ -176,7 +176,7 @@ def to_latex_t1(fmt: pd.DataFrame) -> str:
 def compute_table3_metrics(df: pd.DataFrame) -> dict:
     """
     Compute portfolio characteristics for Table 3.
-    Avg K: for MVO and 1/N this is the eligible universe size (~867).
+    Avg K: for MVO and 1/N this is the eligible universe size (around 870).
     For the GA, K is chosen adaptively within [10, 30].
     """
     return {
@@ -212,9 +212,9 @@ def build_table3(
 
 def format_table3(table: pd.DataFrame) -> pd.DataFrame:
     fmt = table.copy()
-    fmt[COL_K]     =  table[COL_K].map("{:.1f}".format)
-    fmt[COL_HHI]   =  table[COL_HHI].map("{:.6f}".format)
-    fmt[COL_TO3]   = (table[COL_TO3]   * 100).map("{:.2f}%".format)
+    fmt[COL_K] = table[COL_K].map("{:.1f}".format)
+    fmt[COL_HHI] = table[COL_HHI].map("{:.6f}".format)
+    fmt[COL_TO3] = (table[COL_TO3] * 100).map("{:.2f}%".format)
     fmt[COL_COST3] = (table[COL_COST3] * 100).map("{:.4f}%".format)
     return fmt
 
@@ -257,17 +257,17 @@ if __name__ == "__main__":
 
     print_table1(fmt1)
 
-    table1.to_csv(f"{OUT_DIR}/table1_performance.csv")
-    print(f"\nSaved: {OUT_DIR}/table1_performance.csv")
+    table1.to_csv(f"{OUT_DIR}/T1_performance.csv")
+    print(f"\nSaved: {OUT_DIR}/T1_performance.csv")
 
-    fmt1.to_csv(f"{OUT_DIR}/table1_performance_formatted.csv")
-    print(f"Saved: {OUT_DIR}/table1_performance_formatted.csv")
+    fmt1.to_csv(f"{OUT_DIR}/T1_performance_formatted.csv")
+    print(f"Saved: {OUT_DIR}/T1_performance_formatted.csv")
 
-    with open(f"{OUT_DIR}/table1_performance.tex", "w") as f:
+    with open(f"{OUT_DIR}/T1_performance.tex", "w") as f:
         f.write(to_latex_t1(fmt1))
-    print(f"Saved: {OUT_DIR}/table1_performance.tex")
+    print(f"Saved: {OUT_DIR}/T1_performance.tex")
 
-    to_png(fmt1, f"{OUT_DIR}/table1_performance.png")
+    to_png(fmt1, f"{OUT_DIR}/T1_performance.png")
 
     # Table 3
     print("\nBuilding Table 3...")
@@ -276,14 +276,14 @@ if __name__ == "__main__":
 
     print_table3(fmt3)
 
-    table3.to_csv(f"{OUT_DIR}/table3_characteristics.csv")
-    print(f"\nSaved: {OUT_DIR}/table3_characteristics.csv")
+    table3.to_csv(f"{OUT_DIR}/T3_characteristics.csv")
+    print(f"\nSaved: {OUT_DIR}/T3_characteristics.csv")
 
-    fmt3.to_csv(f"{OUT_DIR}/table3_characteristics_formatted.csv")
-    print(f"Saved: {OUT_DIR}/table3_characteristics_formatted.csv")
+    fmt3.to_csv(f"{OUT_DIR}/T3_characteristics_formatted.csv")
+    print(f"Saved: {OUT_DIR}/T3_characteristics_formatted.csv")
 
-    with open(f"{OUT_DIR}/table3_characteristics.tex", "w") as f:
+    with open(f"{OUT_DIR}/T3_characteristics.tex", "w") as f:
         f.write(to_latex_t3(fmt3))
-    print(f"Saved: {OUT_DIR}/table3_characteristics.tex")
+    print(f"Saved: {OUT_DIR}/T3_characteristics.tex")
 
-    to_png(fmt3, f"{OUT_DIR}/table3_characteristics.png")
+    to_png(fmt3, f"{OUT_DIR}/T3_characteristics.png")

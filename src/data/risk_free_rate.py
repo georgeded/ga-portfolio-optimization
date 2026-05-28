@@ -1,4 +1,5 @@
 # Source: FRED DTB3 - 3-Month Treasury Bill, Monthly Average
+import os
 import pandas as pd
 
 def load_risk_free_rate(path: str = "data/raw/risk_free_rate.csv") -> pd.DataFrame:
@@ -21,5 +22,6 @@ def load_risk_free_rate(path: str = "data/raw/risk_free_rate.csv") -> pd.DataFra
 
 if __name__ == "__main__":
     df = load_risk_free_rate()
+    os.makedirs("data/processed", exist_ok=True)
     df.to_parquet("data/processed/risk_free_rate.parquet", index=False)
     print("Saved to data/processed/risk_free_rate.parquet")

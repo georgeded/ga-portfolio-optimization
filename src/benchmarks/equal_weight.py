@@ -53,8 +53,10 @@ def run_equal_weight(universe: pd.DataFrame, returns: pd.DataFrame,
         portfolio_excess = portfolio_gross - rf
 
         if prev_weights is not None and prev_permnos is not None:
-            drifted_array = align_drifted_weights(prev_weights, prev_permnos, eligible)
-            turnover = portfolio_turnover(weights, drifted_array)
+            pw_raw = (pd.Series(prev_weights, index=prev_permnos)
+                      .reindex(eligible, fill_value=0.0)
+                      .values)
+            turnover = portfolio_turnover(weights, pw_raw)
         else:
             turnover = 1.0
 
@@ -82,7 +84,7 @@ def run_equal_weight(universe: pd.DataFrame, returns: pd.DataFrame,
 if __name__ == "__main__":
     universe, returns = load_data()
 
-    print("\nRunning 1/N — Full Universe...")
+    print("\nRunning 1/N (Full Universe)...")
     results = run_equal_weight(universe, returns)
     print_results(results, "1/N FULL UNIVERSE", show_theoretical_hhi=True)
 

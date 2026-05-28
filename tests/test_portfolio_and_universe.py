@@ -35,14 +35,14 @@ def test_build_monthly_universe_requires_market_cap_and_full_history():
     """Verifies eligibility is the intersection of mktcap>=2B and exactly 60 non-missing returns."""
     dates = pd.date_range("2000-01-31", periods=60, freq="ME")
     rows = []
-    for permno, mktcap_lagged in [(1, 3.0), (2, 3.0), (3, 1.5)]:
+    for permno, mktcap in [(1, 3.0), (2, 3.0), (3, 1.5)]:
         for i, date in enumerate(dates):
             ret = np.nan if permno == 2 and i == 0 else 0.01
             rows.append({
                 "date": date,
                 "permno": permno,
                 "ret": ret,
-                "mktcap_lagged": mktcap_lagged,
+                "mktcap": mktcap,
             })
     df = pd.DataFrame(rows)
 
@@ -52,7 +52,9 @@ def test_build_monthly_universe_requires_market_cap_and_full_history():
 
 
 def test_get_estimation_window_returns_mu_sigma_and_valid_permnos():
-    """Verifies mu and sigma are computed from the complete 60-month return matrix plus 1e-4 ridge."""
+    """Verifies mu and sigma are computed from the complete 60-month return matrix.
+    Sigma uses Ledoit-Wolf shrinkage so only structural properties are checked.
+    """
     dates = pd.date_range("2000-01-31", periods=60, freq="ME")
     stock_1 = np.full(60, 0.01)
     stock_2 = np.linspace(-0.02, 0.04, 60)
@@ -68,11 +70,17 @@ def test_get_estimation_window_returns_mu_sigma_and_valid_permnos():
     )
     expected_matrix = np.column_stack([stock_1, stock_2])
     expected_mu = expected_matrix.mean(axis=0)
-    expected_sigma = np.cov(expected_matrix, rowvar=False) + 1e-4 * np.eye(2)
 
     assert valid_permnos == [1, 2]
     np.testing.assert_allclose(mu, expected_mu, atol=1e-10)
-    np.testing.assert_allclose(sigma, expected_sigma, atol=1e-10)
+
+    # shape
+    assert sigma.shape == (2, 2)
+    # symmetric
+    np.testing.assert_allclose(sigma, sigma.T, atol=1e-12)
+    # positive definite, LW shrinkage guarantees this
+    eigenvalues = np.linalg.eigvalsh(sigma)
+    assert np.all(eigenvalues > 0), f"sigma not positive definite: {eigenvalues}"
 
 
 def test_optimize_mvo_solver_failure_falls_back_to_equal_weight(monkeypatch):

@@ -1,9 +1,11 @@
 # Data
 pandas>=2.2.0
 numpy>=1.26.4
+pyarrow>=14.0.0
 
 # Optimization
 scipy>=1.11.4
+scikit-learn>=1.4.0
 
 # Portfolio / Finance
 statsmodels>=0.14.1

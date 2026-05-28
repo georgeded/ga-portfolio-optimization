@@ -16,6 +16,7 @@ import argparse
 import multiprocessing as mp
 from multiprocessing.pool import Pool
 import os
+import sys
 import time
 
 import numpy as np
@@ -40,33 +41,44 @@ from src.utils.portfolio import (
     print_results,
 )
 
-N_RUNNERS  = 8
-BASE_SEED  = 1000        # run i uses seed BASE_SEED + i
+N_RUNNERS = 8
+BASE_SEED = 1000  # run i uses seed BASE_SEED + i
 OUTPUT_DIR = "results/ga"
-CHECKPOINT         = os.path.join(OUTPUT_DIR, "checkpoint.parquet")
-FINAL_OUT          = os.path.join(OUTPUT_DIR, "ga_results.parquet")
+CHECKPOINT = os.path.join(OUTPUT_DIR, "checkpoint.parquet")
+FINAL_OUT = os.path.join(OUTPUT_DIR, "ga_results.parquet")
 WEIGHTS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_weights.npy")
 PERMNOS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_permnos.npy")
+
+# fixed params from initial Optuna tuning (2005-2012, 15 trials).
+# walk-forward per-period tuning was computationally infeasible at
+# about 20 min/period on the available VM within the thesis timeline.
+FIXED_PARAMS = {
+    "pc": ga_module.PC,
+    "pm": ga_module.PM,
+    "sigma_m": ga_module.SIGMA_M,
+    "lambda_": ga_module.LAMBDA,
+}
 
 
 # module-level for multiprocessing pickling
 def run_single_ga(args: tuple) -> np.ndarray:
-    """args: (n_assets, mu, sigma, prev_weights, seed, n_gens)"""
-    n_assets, mu, sigma, prev_weights, seed, n_gens = args
+    """args: (n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_)"""
+    n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_ = args
 
-    original_n_gens = ga_module.N_GENS
+    # each worker has its own copy of ga_module (separate process), so setting
+    # these globals here is safe and does not affect other workers
     ga_module.N_GENS = n_gens
-    try:
-        rng = np.random.default_rng(seed)
-        w = run_ga(n_assets, mu, sigma, prev_weights, rng)
-    finally:
-        ga_module.N_GENS = original_n_gens
+    ga_module.PC = pc
+    ga_module.PM = pm
+    ga_module.SIGMA_M = sigma_m
+    ga_module.LAMBDA = lambda_
 
-    return w
+    rng = np.random.default_rng(seed)
+    return run_ga(n_assets, mu, sigma, prev_weights, rng)
 
 
 def set_affinity(core_id: int) -> None:
-    """Pin worker to one logical CPU. Best-effort, no crash."""
+    """Try to pin this worker to one CPU core."""
     try:
         allowed = sorted(os.sched_getaffinity(0))
         cpu = allowed[core_id % len(allowed)]
@@ -92,8 +104,17 @@ def _process_period(
     n_gens: int,
     pool: Pool,
     gamma: float,
+    params: dict | None = None,
 ) -> tuple[dict, np.ndarray, list]:
     """Returns (result_row, drifted_weights, permnos) for one rebalancing period."""
+    if params is None:
+        params = {
+            "pc":      ga_module.PC,
+            "pm":      ga_module.PM,
+            "sigma_m": ga_module.SIGMA_M,
+            "lambda_": ga_module.LAMBDA,
+        }
+
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
@@ -105,12 +126,24 @@ def _process_period(
     n_assets = len(valid_permnos)
 
     if prev_weights is not None and prev_permnos is not None:
-        pw_aligned = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
+        # pw_raw: reindex without renormalizing, so exited stocks land at zero and
+        # portfolio_turnover picks up the exit cost without a separate term
+        pw_raw = (pd.Series(prev_weights, index=prev_permnos)
+                  .reindex(valid_permnos, fill_value=0.0)
+                  .values)
+        # pw_aligned: renormalized version used as GA's starting-point prev_weights
+        raw_total = pw_raw.sum()
+        if raw_total > 0:
+            pw_aligned = pw_raw / raw_total
+        else:
+            pw_aligned = np.ones(len(valid_permnos)) / len(valid_permnos)
     else:
+        pw_raw = None
         pw_aligned = None
 
     ga_args_list = [
-        (n_assets, mu, sigma, pw_aligned, BASE_SEED + i, n_gens)
+        (n_assets, mu, sigma, pw_aligned, BASE_SEED + i, n_gens,
+         params["pc"], params["pm"], params["sigma_m"], params["lambda_"])
         for i in range(n_runs)
     ]
     indexed_args = [(i % N_RUNNERS, arg) for i, arg in enumerate(ga_args_list)]
@@ -124,7 +157,7 @@ def _process_period(
 
     # Pick the median in-sample run, not the best realised return.
     in_sample_fitnesses = np.array([
-        ga_fitness(w, mu, sigma, pw_aligned, ga_module.LAMBDA)
+        ga_fitness(w, mu, sigma, pw_aligned, params["lambda_"])
         for w in all_weights
     ])
     median_fitness = float(np.median(in_sample_fitnesses))
@@ -135,10 +168,12 @@ def _process_period(
     portfolio_gross = canon_gross
     portfolio_excess = portfolio_gross - rf
 
-    if pw_aligned is not None:
-        turnover = portfolio_turnover(canon_w, pw_aligned)
+    if pw_raw is not None:
+        # pw_raw doesn't sum to 1 when stocks exited, so the half-sum formula
+        # naturally includes the exit cost, no separate term needed
+        turnover = portfolio_turnover(canon_w, pw_raw)
     else:
-        turnover = 1.0   # first-period convention — consistent with benchmarks
+        turnover = 1.0  # first period, consistent with benchmarks
 
     cost = transaction_cost(turnover, gamma)
     net_excess = portfolio_excess - cost
@@ -192,7 +227,9 @@ def _load_checkpoint() -> tuple[list[dict], set, np.ndarray | None, list | None]
 
 def _clear_checkpoint() -> None:
     """Delete all checkpoint files."""
-    for path in [CHECKPOINT, FINAL_OUT, WEIGHTS_CHECKPOINT, PERMNOS_CHECKPOINT]:
+    # FINAL_OUT intentionally excluded: clearing state should not
+    # destroy completed experiment results
+    for path in [CHECKPOINT, WEIGHTS_CHECKPOINT, PERMNOS_CHECKPOINT]:
         if os.path.exists(path):
             os.remove(path)
     print("Checkpoint cleared.")
@@ -200,8 +237,14 @@ def _clear_checkpoint() -> None:
 
 def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
         max_periods: int | None = None, gamma: float = TRANSACTION_COST,
-        clear_checkpoint: bool = False) -> pd.DataFrame:
+        clear_checkpoint: bool = False,
+        lambda_val: float | None = None,
+        output_path: str | None = None) -> pd.DataFrame:
     """Run the full OOS GA experiment with checkpointing. Returns monthly results DataFrame."""
+    if lambda_val is not None:
+        ga_module.LAMBDA = lambda_val
+        FIXED_PARAMS["lambda_"] = lambda_val
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     if clear_checkpoint:
@@ -236,7 +279,7 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
     t0_total = time.time()
 
     with mp.Pool(processes=N_RUNNERS) as pool:
-        for t in tqdm(remaining, desc="GA out-of-sample"):
+        for t in tqdm(remaining, desc="GA out-of-sample", position=0, leave=True):
 
             apply_dates = [
                 d for d in all_return_dates
@@ -251,6 +294,7 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
                 t, apply_date, universe, returns,
                 prev_weights, prev_permnos,
                 n_runs, n_gens, pool, gamma,
+                params=FIXED_PARAMS,
             )
             elapsed = time.time() - t0
 
@@ -267,15 +311,20 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
                 f"excess={result['excess_ret']*100:+.2f}%  "
                 f"turnover={result['turnover']*100:.1f}%  "
                 f"K={result['n_stocks']}  "
-                f"({elapsed:.1f}s)"
+                f"({elapsed:.1f}s)",
+                file=sys.stderr,
             )
 
     total_elapsed = time.time() - t0_total
     print(f"\nTotal runtime: {total_elapsed/60:.1f} min")
 
     results_df = pd.DataFrame(completed_results)
-    results_df.to_parquet(FINAL_OUT, index=False)
-    print(f"Saved to {FINAL_OUT}")
+    save_path = output_path if output_path is not None else FINAL_OUT
+    parent = os.path.dirname(save_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    results_df.to_parquet(save_path, index=False)
+    print(f"Saved to {save_path}")
 
     return results_df
 
@@ -292,10 +341,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Delete existing checkpoint before running",
     )
-    parser.add_argument("--n-runs",      type=int,   default=N_RUNNERS)
-    parser.add_argument("--n-gens",      type=int,   default=ga_module.N_GENS)
-    parser.add_argument("--max-periods", type=int,   default=None)
-    parser.add_argument("--gamma",       type=float, default=TRANSACTION_COST)
+    parser.add_argument("--n-runs", type=int, default=N_RUNNERS)
+    parser.add_argument("--n-gens", type=int, default=ga_module.N_GENS)
+    parser.add_argument("--max-periods", type=int, default=None)
+    parser.add_argument("--gamma", type=float, default=TRANSACTION_COST)
+    parser.add_argument("--lambda-val", type=float, default=None)
+    parser.add_argument("--output", type=str, default=None)
     args = parser.parse_args()
 
     if args.debug:
@@ -306,6 +357,8 @@ if __name__ == "__main__":
             max_periods=10,
             gamma=args.gamma,
             clear_checkpoint=args.clear_checkpoint,
+            lambda_val=args.lambda_val,
+            output_path=args.output,
         )
     else:
         results = run(
@@ -314,6 +367,8 @@ if __name__ == "__main__":
             max_periods=args.max_periods,
             gamma=args.gamma,
             clear_checkpoint=args.clear_checkpoint,
+            lambda_val=args.lambda_val,
+            output_path=args.output,
         )
 
     if len(results) > 0:

@@ -1,7 +1,7 @@
 """
 Universe construction: eligible stocks at each rebalancing date.
 Filters: NYSE/NASDAQ only, common stocks (CIZ equivalents of shrcd IN (10,11)),
-market cap ≥ $2B (lagged 1 month), exactly 60 non-missing returns in the 60-month window.
+market cap >= $2B (lagged 1 month), exactly 60 non-missing returns in the 60-month window.
 """
 
 import pandas as pd
@@ -24,8 +24,8 @@ def load_raw_crsp(path: str = "data/raw/crsp_returns.parquet") -> pd.DataFrame:
 
 def compute_market_cap(df: pd.DataFrame) -> pd.DataFrame:
     """
-    mktcap = |prc| × shrout (in billions); shrout in thousands.
-    Lagged 1 month — at time t, uses t-1 market cap.
+    mktcap = |prc| * shrout (in billions); shrout in thousands.
+    Lagged 1 month; at time t, uses t-1 market cap.
     """
     df = df.copy()
     df["mktcap"] = df["prc"].abs() * df["shrout"] * SHROUT_SCALE / 1e9
@@ -62,13 +62,19 @@ def filter_basic(df: pd.DataFrame) -> pd.DataFrame:
 
 def build_monthly_universe(df: pd.DataFrame, rebalance_date: pd.Timestamp) -> pd.Index:
     """
-    1. Market cap ≥ $2B at t-1 (last available obs before t; robust to end-of-month gaps)
-    2. Exactly 60 non-missing returns in [t-60, t-1]
-    3. Delisted assets auto-excluded (no post-delisting return data)
-    Returns pd.Index of eligible PERMNOs.
+    Build the eligible stock universe for a single rebalancing date.
+
+    Rule 1: market cap >= $2B at exactly t-1, using the t-1 observation's mktcap
+    column (not mktcap_lagged, which would give t-2). Stocks with no observation
+    at t-1 are excluded; using "last available before t" was too loose and could
+    pull in stale data from 2+ months ago.
+
+    Rule 2: exactly 60 non-missing returns in [t-60, t-1].
+
+    Rule 3: delisted stocks are auto-excluded because they have no return data.
+
+    Returns a pd.Index of eligible PERMNOs.
     """
-    # CRSP dates are end-of-month; subtract 1 day so end-of-month dates
-    # fall inside the window (e.g. Dec 31 is included for Jan 1 rebalance)
     window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
 
@@ -77,14 +83,14 @@ def build_monthly_universe(df: pd.DataFrame, rebalance_date: pd.Timestamp) -> pd
         (df["date"] <= window_end)
     ]
 
-    last_obs = (
-        df[df["date"] <= window_end]
-        .sort_values("date")
-        .groupby("permno")
-        .tail(1)
-    )
+    # match t-1 by year+month to handle end-of-month vs start-of-month mismatches
+    t_minus_1 = rebalance_date - pd.DateOffset(months=1)
+    last_obs = df[
+        (df["date"].dt.year  == t_minus_1.year) &
+        (df["date"].dt.month == t_minus_1.month)
+    ]
     eligible_mktcap = last_obs[
-        last_obs["mktcap_lagged"] >= MIN_MARKET_CAP_B
+        last_obs["mktcap"] >= MIN_MARKET_CAP_B
     ]["permno"]
 
     return_counts = (
@@ -105,7 +111,7 @@ def build_full_universe(df: pd.DataFrame, start_date: str = "2005-01-01",
                         end_date: str = "2025-12-01") -> dict:
     """
     Returns {pd.Timestamp -> list of PERMNOs} for each monthly date.
-    Data from 2000 + 60-month burn-in → first usable date is 2005-01-01.
+    Data from 2000 + 60-month burn-in -> first usable date is 2005-01-01.
     """
     df = compute_market_cap(df)
     df = filter_basic(df)

@@ -1,7 +1,7 @@
 """
 Figure A1 - GA Convergence (Tuned vs Default Parameters).
 Three dates: Jan 2007 (pre-crisis), Jan 2010 (post-crisis), Jan 2020 (recent).
-N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, λ inactive).
+N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, lambda inactive).
 Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png.
 """
 
@@ -24,7 +24,10 @@ BASE_SEED = 42
 OUT_DIR = "results/figures"
 TUNED_LABEL = "Tuned (Optuna)"
 
-# Tuned parameters (Optuna — best_params.json)
+# Tuned parameters from initial fixed-window Optuna run (2005-2012).
+# The main experiment uses walk-forward per-period tuning, so there
+# is no single canonical tuned set. These values serve as a
+# representative illustration for the convergence diagnostic only.
 TUNED_PARAMS = {
     "pc": 0.6054,
     "pm": 0.1370,
@@ -49,8 +52,8 @@ CONFIG_STYLES = {
 
 DATE_COLORS = ["#000000", "#555555", "#999999"]
 
-# λ is inactive and fitness = pure Sharpe — explicit in axis label
-YAXIS_LABEL = "In-sample Sharpe  (prev_weights=None, λ inactive)"
+# lambda is inactive and fitness = pure Sharpe, shown in the axis label
+YAXIS_LABEL = "In-sample Sharpe  (prev_weights=None, lambda inactive)"
 
 plt.rcParams.update({
     "figure.dpi": 300,
@@ -73,7 +76,7 @@ def run_convergence_for_config(mu: np.ndarray, sigma: np.ndarray,
                                 n_assets: int, params: dict) -> tuple:
     """
     Temporarily overrides ga_module constants; restores after run regardless of exceptions.
-    prev_weights=None: λ inactive, fitness = pure in-sample Sharpe.
+    prev_weights=None: lambda inactive, fitness = pure in-sample Sharpe.
     Returns (median_traj, q25, q75, generations, median_stop).
     """
     orig_pc = ga_module.PC
@@ -138,7 +141,7 @@ def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
                         alpha=style["alpha_band"], color=color)
 
     ax.set_title(
-        f"Figure A1: GA Convergence — {config_lbl} Parameters\n"
+        f"Figure A1: GA Convergence ({config_lbl} Parameters)\n"
         f"(median ± IQR across {N_RUNS_CONV} independent runs)"
     )
     ax.set_xlabel("Generation")
@@ -146,7 +149,7 @@ def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
     ax.legend(loc="lower right", framealpha=0.9)
     fig.tight_layout()
     out_path = f"{OUT_DIR}/{filename}"
-    fig.savefig(out_path)
+    fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved: {out_path}")
 
@@ -177,9 +180,9 @@ def plot_comparison(results: dict) -> None:
         ax.legend(loc="lower right", framealpha=0.9, fontsize=9)
 
     fig.suptitle(
-        "Figure A1: GA Convergence — Tuned vs Default Parameters\n"
+        "Figure A1: GA Convergence: Tuned vs Default Parameters\n"
         f"(median ± IQR, {N_RUNS_CONV} runs; "
-        "fitness = in-sample Sharpe, λ inactive)",
+        "fitness = in-sample Sharpe, lambda inactive)",
         fontsize=12,
     )
     fig.tight_layout()
@@ -222,7 +225,7 @@ def run_convergence() -> None:
             print(f"\n  Running {lbl} "
                   f"(pc={params['pc']}, pm={params['pm']}, "
                   f"sigma_m={params['sigma_m']}) "
-                  f"[λ inactive — prev_weights=None]...")
+                  f"[lambda inactive, prev_weights=None]...")
 
             median_traj, q25, q75, generations, median_stop = \
                 run_convergence_for_config(mu, sigma, n_assets, params)

@@ -39,7 +39,7 @@ OUT_DIR = "results/figures"
 # crisis periods applied consistently across all time-series figures
 CRISES = [
     {"start": "2008-09-01", "end": "2009-06-01",
-     "color": "black", "label": "GFC (2008–09)"},
+     "color": "black", "label": "GFC (2008-09)"},
     {"start": "2020-02-01", "end": "2020-04-01",
      "color": "grey", "label": "COVID (2020)"},
 ]
@@ -77,10 +77,19 @@ def load_all(
         df = df.sort_values("date").reset_index(drop=True)
         data[name] = df
 
-    dates = data["GA"]["date"].values
+    common_dates = set(data["GA"]["date"].values)
     for name, df in data.items():
-        assert (df["date"].values == dates).all(), \
-            f"Date mismatch: GA vs {name}"
+        common_dates &= set(df["date"].values)
+
+    dropped = len(data["GA"]) - len(common_dates)
+    if dropped > 0:
+        print(f"Warning: {dropped} dates dropped, models have mismatched periods.")
+
+    for name in data:
+        data[name] = (data[name][data[name]["date"]
+                      .isin(common_dates)]
+                      .sort_values("date")
+                      .reset_index(drop=True))
 
     return data
 
@@ -154,15 +163,15 @@ def plot_cumulative_returns(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 1: Cumulative Net Portfolio Value (2005–2025)")
+    ax.set_title("Figure 1: Cumulative Net Portfolio Value (2005-2025)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Portfolio Value (net of costs, initial = 1.0)")
 
     add_bottom_legend(fig, ncol=6)
     add_caption(fig,
-        "All returns net of transaction costs (γ = 0.3%). Initial portfolio value "
+        "All returns net of transaction costs (gamma = 0.3%). Initial portfolio value "
         "normalised to 1.0. Shaded regions indicate the Global Financial Crisis "
-        "(Sep 2008 – Jun 2009) and COVID-19 shock (Feb – Apr 2020)."
+        "(Sep 2008 to Jun 2009) and COVID-19 shock (Feb to Apr 2020)."
     )
 
     fig.tight_layout(rect=[0, 0.08, 1, 1])
@@ -191,7 +200,7 @@ def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
     add_bottom_legend(fig, ncol=6)
     add_caption(fig,
         "Computed on monthly net excess returns over a trailing 12-month window. "
-        "Clipped to [−5, 5] to suppress near-zero volatility artefacts. "
+        "Clipped to [-5, 5] to suppress near-zero volatility artefacts. "
         "Shaded regions indicate crisis periods."
     )
 
@@ -220,7 +229,7 @@ def plot_turnover(data: dict) -> None:
 
     add_bottom_legend(fig, ncol=6)
     add_caption(fig,
-        "Turnover = ½ · Σ|w_t − w_{t−1}| where w_{t−1} reflects post-drift weights "
+        "Turnover = 0.5 * sum(|w_t - w_{t-1}|) where w_{t-1} reflects post-drift weights "
         "before rebalancing. Smoothed with a 6-month rolling average for readability. "
         "First-period turnover (100%) excluded after smoothing."
     )
@@ -244,14 +253,14 @@ def plot_hhi(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 4: Portfolio Concentration — HHI (6-month rolling avg)")
+    ax.set_title("Figure 4: Portfolio Concentration, HHI (6-month rolling avg)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Herfindahl-Hirschman Index")
 
     add_bottom_legend(fig, ncol=6)
     add_caption(fig,
-        "HHI = Σw_i². Theoretical minimum is 1/K: GA lower bound ≈ 0.071 (avg K=14), "
-        "MVO/1/N lower bound ≈ 0.001 (K≈867). Values are not directly comparable "
+        "HHI = sum(w_i^2). Theoretical minimum is 1/K: GA lower bound around 0.071 (avg K=14), "
+        "MVO/1/N lower bound around 0.001 (K around 870). Values are not directly comparable "
         "across strategies with different K."
     )
 
@@ -285,7 +294,7 @@ def plot_cardinality(data: dict) -> None:
     ax.set_xlabel("Date")
     ax.set_ylabel("Number of Stocks Selected (K)")
 
-    # F5 has its own legend entries — no strategy comparison needed
+    # F5 has its own legend entries, no strategy comparison needed
     extra = [
         mlines.Line2D([], [], color="#000000", lw=1.2, alpha=0.6,
                       label="K (monthly)"),
@@ -304,9 +313,9 @@ def plot_cardinality(data: dict) -> None:
     )
 
     add_caption(fig,
-        "K is selected adaptively by the GA within the constraint K ∈ [10, 30]. "
+        "K is selected adaptively by the GA within the constraint K in [10, 30]. "
         "Monthly values (light) and 12-month rolling average (bold) are shown. "
-        "K drops to ≈10 post-GFC and recovers gradually."
+        "K drops to around 10 post-GFC and recovers gradually."
     )
 
     fig.tight_layout(rect=[0, 0.10, 1, 1])

@@ -109,8 +109,12 @@ def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma
     portfolio_excess = portfolio_gross - rf
 
     if prev_weights is not None and prev_permnos is not None:
-        drifted_array = align_drifted_weights(prev_weights, prev_permnos, valid_permnos)
-        to = portfolio_turnover(weights, drifted_array)
+        # reindex without renormalizing so exited stocks sit at zero and their
+        # weight shows up naturally in the half-sum turnover calculation
+        pw_raw = (pd.Series(prev_weights, index=prev_permnos)
+                  .reindex(valid_permnos, fill_value=0.0)
+                  .values)
+        to = portfolio_turnover(weights, pw_raw)
     else:
         to = 1.0
 

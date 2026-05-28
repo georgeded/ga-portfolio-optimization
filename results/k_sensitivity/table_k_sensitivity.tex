@@ -1,0 +1,16 @@
+\begin{table}
+\caption{K-sensitivity analysis: GA performance and portfolio characteristics with fixed cardinality $K \in \{10, 15, 20, 25, 30\}$ (January 2005--December 2025). Fixed hyperparameters (pc=0.6054, pm=0.1370, $\sigma_m$=0.1469, $\lambda$=1.8437) are used throughout to isolate the effect of $K$. $\bar{K}_{\text{actual}}$ is the mean number of stocks held per period and should equal $K$; deviations flag constraint violations.}
+\label{tab:k_sensitivity}
+\begin{tabular}{rrrrrrrrr}
+\toprule
+ & Sharpe & Ann.~Ret. & Ann.~Vol. & Max DD & Turnover & Avg Cost & HHI & $\bar{K}_{\text{actual}}$ \\
+$K$ &  &  &  &  &  &  &  &  \\
+\midrule
+10 & 0.2632 & 5.52% & 20.99% & -45.74% & 23.24% & 0.0697% & 0.115482 & 10.0 \\
+15 & 0.3254 & 6.28% & 19.28% & -54.64% & 20.21% & 0.0606% & 0.088479 & 15.0 \\
+20 & 0.3051 & 5.70% & 18.68% & -57.93% & 19.01% & 0.0570% & 0.071612 & 20.0 \\
+25 & 0.4400 & 7.99% & 18.15% & -54.58% & 18.69% & 0.0561% & 0.056699 & 25.0 \\
+30 & 0.4363 & 7.35% & 16.84% & -50.19% & 19.59% & 0.0588% & 0.043961 & 30.0 \\
+\bottomrule
+\end{tabular}
+\end{table}

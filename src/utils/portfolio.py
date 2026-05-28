@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.covariance import LedoitWolf
 
 from src.evaluation.metrics import compute_all_metrics, TRANSACTION_COST
 ESTIMATION_WINDOW = 60
@@ -50,7 +51,7 @@ def cap_universe(universe: pd.DataFrame, returns: pd.DataFrame, top_n: int = 200
 
 
 def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_permnos: list) -> np.ndarray:
-    """Align drifted weights to the current universe (new/departed stocks → 0).
+    """Align drifted weights to the current universe (new/departed stocks -> 0).
     Falls back to equal weight if all holdings have left the universe.
     """
     aligned = (pd.Series(prev_weights, index=prev_permnos)
@@ -60,14 +61,15 @@ def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_per
     if total > 0:
         aligned = aligned / total
     else:
-        # all previous stocks left universe — treat as full replacement
+        # all previous stocks left universe, treat as full replacement
         aligned = np.ones(len(curr_permnos)) / len(curr_permnos)
     return aligned
 
 
 def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: pd.Timestamp) -> tuple:
     """Build mu and sigma from the 60-month window [t-60, t-1].
-    Drops stocks with any missing month — regularises sigma with + 1e-4 * I.
+    Drops stocks with any missing month. Sigma is estimated with Ledoit-Wolf
+    shrinkage, which is more stable than sample covariance at high N/T ratios.
     """
     window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
@@ -89,15 +91,16 @@ def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: 
 
     ret_array = ret_matrix.values
     mu = ret_array.mean(axis=0)
-    sigma = np.cov(ret_array, rowvar=False)
-    sigma = sigma + 1e-4 * np.eye(len(valid_permnos))
+    lw = LedoitWolf()
+    lw.fit(ret_array)
+    sigma = lw.covariance_
 
     return mu, sigma, valid_permnos
 
 
 def print_results(results: pd.DataFrame, label: str, gamma: float = TRANSACTION_COST,
                   show_theoretical_hhi: bool = False) -> None:
-    """show_theoretical_hhi: print the 1/K lower bound — only meaningful for equal-weight."""
+    """show_theoretical_hhi: print the 1/K lower bound, only meaningful for equal-weight."""
     clean = results.dropna(subset=["excess_ret", "rf", "turnover"])
     excess = clean["excess_ret"].values
     rf = clean["rf"].values

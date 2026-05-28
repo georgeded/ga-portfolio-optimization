@@ -1,34 +1,34 @@
 """
 Genetic Algorithm for cardinality-constrained portfolio optimization.
 Chromosome: real-valued weight vector of length N (universe size).
-Exactly K entries are non-zero, with w_i ∈ [W_MIN, W_MAX] summing to 1.
+Exactly K entries are non-zero, with w_i in [W_MIN, W_MAX] summing to 1.
 """
 
 import numpy as np
 from src.evaluation.metrics import portfolio_turnover
 
 # not tuned by Optuna
-K_MIN      = 10
-K_MAX      = 30
-W_MIN      = 0.02
-W_MAX      = 0.15
-POP_SIZE   = 100
-N_GENS     = 200
-ELITE_FRAC = 0.05    # top fraction preserved unchanged each generation
-LOCAL_ITER = 5       # hill-climber steps per elite refinement
-LOCAL_STEP = 0.01    # weight-shift step size δ
-EARLY_STOP = 20      # stagnation patience (generations)
-TOURNAMENT = 3       # tournament size
+K_MIN = 10
+K_MAX = 30
+W_MIN = 0.02
+W_MAX = 0.15
+POP_SIZE = 100
+N_GENS = 200
+ELITE_FRAC = 0.05  # top fraction kept each generation
+LOCAL_ITER = 5  # hill-climber steps per elite refinement
+LOCAL_STEP = 0.01  # weight-shift step size delta
+EARLY_STOP = 20  # stagnation patience in generations
+TOURNAMENT = 3  # tournament size
 
-PC      = 0.6054
-PM      = 0.1370
+PC = 0.6054
+PM = 0.1370
 SIGMA_M = 0.1469
-LAMBDA  = 1.8437
+LAMBDA = 1.8437
 
 DEBUG = False
 
 def project_bounded_simplex(v, lower, upper, tol=1e-12):
-    """Project onto bounded weights that sum to one."""
+    """Project weights onto the feasible simplex."""
     v = np.asarray(v, dtype=float)
     n = len(v)
 
@@ -56,7 +56,7 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
 
 
 def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.ndarray:
-    """Bring a chromosome back inside the portfolio constraints."""
+    """Fix a chromosome so it satisfies all constraints."""
     if depth > 1:
         raise ValueError("Repair recursion exceeded 1 call.")
 
@@ -136,8 +136,17 @@ def initialize_population(n_assets: int, rng: np.random.Generator) -> np.ndarray
 def fitness(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
             prev_weights: np.ndarray | None = None, lambda_: float = LAMBDA) -> float:
     """Sharpe minus turnover penalty."""
-    port_return = float(weights @ mu)
-    port_var = float(weights @ sigma @ weights)
+    # using only the held stocks avoids polluting the Sharpe with the
+    # full-universe covariance, zeros in weights contribute nothing but noise
+    held = weights > 0
+    if not held.any():
+        return 0.0
+    w_held = weights[held]
+    mu_held = mu[held]
+    sigma_held = sigma[np.ix_(held, held)]
+
+    port_return = float(w_held @ mu_held)
+    port_var = float(w_held @ sigma_held @ w_held)
 
     if port_var <= 0.0:
         sharpe = 0.0
@@ -147,6 +156,7 @@ def fitness(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
     if prev_weights is None or lambda_ < 1e-12:
         penalty = 0.0
     else:
+        # turnover on full vectors so stocks exiting the portfolio count
         penalty = lambda_ * portfolio_turnover(weights, prev_weights)
 
     return sharpe - penalty
@@ -229,10 +239,11 @@ def mutate(w: np.ndarray, rng: np.random.Generator, pm: float = PM) -> np.ndarra
 
 
 def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
-                 prev_weights: np.ndarray | None, rng: np.random.Generator) -> tuple[np.ndarray, float]:
+                 prev_weights: np.ndarray | None, rng: np.random.Generator,
+                 lambda_: float = LAMBDA) -> tuple[np.ndarray, float]:
     """Small greedy weight shifts on the current holdings."""
     w_best = w.copy()
-    f_best = fitness(w_best, mu, sigma, prev_weights, LAMBDA)
+    f_best = fitness(w_best, mu, sigma, prev_weights, lambda_)
 
     for _ in range(LOCAL_ITER):
         held = np.nonzero(w_best > 1e-10)[0]
@@ -251,7 +262,7 @@ def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
         w_cand[i] -= delta
         w_cand[j] += delta
 
-        f_cand = fitness(w_cand, mu, sigma, prev_weights, LAMBDA)
+        f_cand = fitness(w_cand, mu, sigma, prev_weights, lambda_)
         if f_cand > f_best:
             w_best = w_cand
             f_best = f_cand
@@ -283,7 +294,7 @@ def run_ga(n_assets: int, mu: np.ndarray, sigma: np.ndarray,
         elite_fit = fitnesses[elite_idx].copy()
 
         elites[-1], elite_fit[-1] = local_refine(
-            elites[-1], mu, sigma, prev_weights, rng
+            elites[-1], mu, sigma, prev_weights, rng, lambda_=LAMBDA
         )
 
         new_pop = np.empty_like(population)

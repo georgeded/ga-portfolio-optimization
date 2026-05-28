@@ -5,7 +5,7 @@ set -e
 # accidentally create when OUTPUT_DIR resolves relative to results/.
 [ -d "results/results" ] && rm -rf results/results
 
-echo "=== Running all evaluation scripts ==="
+echo "Running all evaluation scripts"
 
 echo "[1/9] Ablation..."
 python3 -m src.ablation.ablation_lambda
@@ -35,6 +35,6 @@ echo "[9/9] Frontier..."
 python3 -m src.evaluation.frontier
 
 echo ""
-echo "=== ALL DONE ==="
+echo "ALL DONE"
 echo "PNGs saved in:"
 find results/ -name "*.png" | sort

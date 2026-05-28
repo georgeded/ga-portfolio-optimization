@@ -45,8 +45,12 @@ def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> f
 
 
 def optimize_mvo(mu: np.ndarray, sigma: np.ndarray, w_min: float, w_max: float,
-                 n_restarts: int = 1, rng: np.random.Generator = None) -> np.ndarray:
-    """Maximize Sharpe (SLSQP, n_restarts random starts). Falls back to equal weights on failure."""
+                 n_restarts: int = 3, rng: np.random.Generator = None) -> np.ndarray:
+    """Maximize Sharpe (SLSQP, n_restarts random starts). Falls back to equal weights on failure.
+
+    Three restarts reduce dependence on a single initial point while keeping the benchmark
+    feasible to run across all 252 monthly periods.
+    """
     if rng is None:
         rng = np.random.default_rng(seed=42)
 

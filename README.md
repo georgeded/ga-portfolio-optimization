@@ -101,7 +101,7 @@ run_evaluation.sh
 tests/
   test_metrics.py
   test_genetic_algorithm.py
-  test_additional.py
+  test_backtest_integrity.py
 results/
   figures/         F1-F6, A1 convergence PNGs
   tables/          T1_performance through T8_k_behavior (CSV, LaTeX, PNG)
@@ -135,9 +135,10 @@ results/
 - 8 independent runs per period; canonical portfolio is the one closest to median in-sample fitness
 
 **MVO benchmarks**
-- Unconstrained: maximize Sharpe, long-only bounds [0, 1], SLSQP (maxiter=200, ftol=1e-6)
-- Constrained: maximize Sharpe, long-only, max weight 0.15, SLSQP
+- Unconstrained: maximize Sharpe, long-only bounds [0, 1], SLSQP (maxiter=200, ftol=1e-6, 3 random restarts)
+- Constrained: maximize Sharpe, long-only, max weight 0.15, SLSQP (3 random restarts)
 - Both use the same estimation window, universe, and cost model as the GA
+- Three restarts were used to reduce sensitivity to initial conditions; a rerun confirmed the reported numbers are unchanged
 
 **Evaluation protocol**
 - 252 monthly OOS periods, January 2005 to December 2025
@@ -252,15 +253,22 @@ python3 -m src.evaluation.convergence
 python3 -m src.evaluation.frontier
 ```
 
-## Requirements
+## Setup
 
 Python 3.11+.
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+python3 -m pytest
 ```
 
 Key dependencies: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pyarrow`, `statsmodels`, `optuna`, `matplotlib`, `seaborn`, `tqdm`.
+
+## Limitations and reproducibility
+
+Raw CRSP data is not included because it is proprietary (WRDS subscription required). `requirements.txt` lists the Python dependencies. `REPRODUCIBILITY.md` gives the exact reproduction order from raw data to final figures. The integrity tests in `tests/` use synthetic data only and can be run without WRDS access.
 
 ## License
 

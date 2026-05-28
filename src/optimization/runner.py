@@ -214,7 +214,10 @@ def _load_checkpoint() -> tuple[list[dict], set, np.ndarray | None, list | None]
     """Load checkpoint state. prev_weights/prev_permnos are None if weight file is missing."""
     ckpt = pd.read_parquet(CHECKPOINT)
     completed_results = ckpt.to_dict("records")
-    completed_dates = set(ckpt["date"].tolist())
+    # Universe dates are start-of-month; checkpoint dates are apply dates (end-of-month).
+    # Compare by (year, month) so the resume logic is not fooled by the day difference.
+    completed_dates = {(pd.Timestamp(d).year, pd.Timestamp(d).month)
+                       for d in ckpt["date"]}
 
     prev_weights = None
     prev_permnos = None
@@ -268,11 +271,11 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
             _load_checkpoint()
         print(f"Resuming from checkpoint: {len(completed_results)} periods done.")
         if prev_weights is not None:
-            print("  prev_weights state recovered; turnover will be accurate.")
+            print("  prev_weights found; turnover will be accurate.")
         else:
             print("  prev_weights not found; first resumed period uses turnover=1.0.")
 
-    remaining = [t for t in rebalance_dates if t not in completed_dates]
+    remaining = [t for t in rebalance_dates if (t.year, t.month) not in completed_dates]
     print(f"Periods remaining: {len(remaining)}")
     print(f"Runs: {n_runs}, max generations: {n_gens}")
 

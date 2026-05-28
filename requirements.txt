@@ -19,3 +19,9 @@ tqdm>=4.66.2
 
 # Hyperparameter optimization
 optuna>=3.5.0
+
+# Testing
+pytest>=8.0.0
+
+# Required by pandas to_latex()
+jinja2>=3.0.0

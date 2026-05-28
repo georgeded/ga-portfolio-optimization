@@ -8,7 +8,7 @@ produces a summary table.
 
 Runtime: approx. 35 minutes for the GA run.
 
-Usage: python3 ablation_lambda.py
+Usage: python3 -m src.ablation.ablation_lambda
 """
 
 import os
@@ -44,16 +44,38 @@ def metrics_row(df: pd.DataFrame, label: str) -> dict:
     }
 
 
+def _is_complete(path: str, expected_rows: int = 252) -> bool:
+    """Return True if the parquet exists, has the expected number of rows,
+    and covers at least Jan 2005 to Dec 2025."""
+    if not os.path.exists(path):
+        return False
+    try:
+        df = pd.read_parquet(path)
+        if len(df) < expected_rows:
+            return False
+        dates = pd.to_datetime(df["date"])
+        if dates.min().year > 2005 or dates.max().year < 2025:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(TABLE_DIR, exist_ok=True)
 
     lam0_path = f"{OUTPUT_DIR}/lambda0_results.parquet"
-    if os.path.exists(lam0_path):
-        print(f"Found existing lambda=0 results at {lam0_path}, skipping GA run.")
+    if _is_complete(lam0_path):
+        print(f"Found complete lambda=0 results at {lam0_path}, skipping GA run.")
         df_lam0 = pd.read_parquet(lam0_path)
     else:
-        print("Running GA with lambda=0 ...")
+        if os.path.exists(lam0_path):
+            existing = pd.read_parquet(lam0_path)
+            print(f"lambda=0 parquet exists but is incomplete "
+                  f"({len(existing)} rows). Re-running GA.")
+        else:
+            print("Running GA with lambda=0 ...")
         df_lam0 = run(
             lambda_val=0.0,
             output_path=lam0_path,

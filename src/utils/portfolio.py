@@ -7,6 +7,13 @@ ESTIMATION_WINDOW = 60
 
 
 def get_monthly_returns(returns: pd.DataFrame, permnos: list, month: pd.Timestamp) -> pd.Series:
+    """Return application-month returns aligned to the optimized universe.
+
+    Missing application-month returns are filled with 0.0 so the realised
+    return vector stays aligned with the optimized weight vector. This is a
+    practical treatment for rare missing observations and is discussed as a
+    backtest limitation in the thesis.
+    """
     mask = (
         (returns["date"] == month) &
         (returns["permno"].isin(permnos))

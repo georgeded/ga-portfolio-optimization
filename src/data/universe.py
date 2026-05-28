@@ -137,7 +137,7 @@ def build_full_universe(df: pd.DataFrame, start_date: str = "2005-01-01",
 
 
 def validate_universe(universe: dict) -> None:
-    """Universe size of 100-300 was the original literature estimate; actual size is unconstrained."""
+    """Check for empty universes and large month-to-month size jumps."""
     sizes = pd.Series(
         {date: len(stocks) for date, stocks in universe.items()}
     )
@@ -160,8 +160,8 @@ def validate_universe(universe: dict) -> None:
     print(f"  Median : {sizes.median():.0f} stocks")
     print(f"  Min    : {sizes.min()} stocks")
     print(f"  Max    : {sizes.max()} stocks")
-    print("  Note   : Step 5 estimate was 100-300 based on literature.")
-    print("           Actual size reflects full $2B filter on real data.")
+    print("  Note   : typical literature estimates are 100-300; actual size")
+    print("           reflects the full $2B market cap filter on real data.")
 
 
 if __name__ == "__main__":

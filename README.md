@@ -1,6 +1,28 @@
 # GA Portfolio Optimization
 
-BSc CS thesis project at VU Amsterdam. A genetic algorithm for cardinality-constrained portfolio optimization on US equities, evaluated out-of-sample from January 2005 to December 2025 and compared against mean-variance optimization (MVO) and equal-weight (1/N) benchmarks. The GA selects between 10 and 30 stocks per month, optimizes a Sharpe-minus-turnover fitness function with hyperparameters fixed from an initial Optuna tuning run, and is tested across 252 monthly out-of-sample periods using a rolling 60-month estimation window and a transaction cost of gamma = 0.3% per unit of turnover. Covariance is estimated with the Ledoit-Wolf shrinkage estimator. The core question is whether an evolutionary algorithm that directly constrains portfolio size, weight concentration, and turnover can produce better out-of-sample risk-adjusted returns than MVO on a large universe where the sample covariance matrix is rank-deficient (T = 60, N around 870).
+BSc CS thesis project at VU Amsterdam. A genetic algorithm for cardinality-constrained portfolio optimization on US equities, evaluated out-of-sample from January 2005 to December 2025 and compared against mean-variance optimization (MVO) and equal-weight (1/N) benchmarks. The GA selects between 10 and 30 stocks per month, optimizes a Sharpe-minus-turnover fitness function with hyperparameters fixed from an initial Optuna tuning run, and is tested across 252 monthly out-of-sample periods using a rolling 60-month estimation window and a transaction cost of gamma = 0.3% per unit of turnover. Covariance is estimated with the Ledoit-Wolf shrinkage estimator. The core question is whether an evolutionary algorithm that directly constrains portfolio size, weight concentration, and turnover can produce better out-of-sample risk-adjusted returns than MVO on a large universe where the sample covariance is rank-deficient at T = 60, N around 870; Ledoit-Wolf shrinkage is applied to produce a well-conditioned estimate.
+
+## Research Questions and Hypotheses
+
+**RQ1:** What is the impact of a maximum weight bound (0.15 per stock) on
+out-of-sample risk-adjusted performance compared to unconstrained MVO?
+
+**RQ2:** Under realistic constraints (cardinality K ∈ [10, 30], weight bounds
+[0.02, 0.15], γ = 0.3%), does the GA achieve out-of-sample Sharpe ratios
+competitive with or superior to constrained MVO, unconstrained MVO, and 1/N?
+
+**RQ3:** How does portfolio cardinality K affect out-of-sample risk-adjusted
+return, concentration, and turnover, and does the adaptive K mechanism match
+fixed-K performance?
+
+**H1:** The 0.15 weight cap preserves or improves Sharpe vs unconstrained MVO.
+**H2:** The GA achieves competitive or superior Sharpe vs all benchmarks.
+**H3:** Higher cardinality configurations (K=25, K=30) outperform the adaptive
+GA, though not necessarily monotonically.
+
+**Outcomes:** H1 weakly supported (near-null result). H2 not confirmed
+(GA Sharpe 0.274 vs MVO 0.581). H3 partially supported (K=25/30 outperform
+adaptive, relationship non-monotonic).
 
 ## Results
 
@@ -15,9 +37,9 @@ Evaluation: January 2005 to December 2025, 252 monthly out-of-sample periods. Al
 
 The GA underperforms all three benchmarks. The Jobson-Korkie test shows the GA vs MVO Sharpe gap is statistically significant (p = 0.004). The GA vs 1/N gap is not significant (p = 0.132).
 
-Constrained and unconstrained MVO produce nearly identical results (Sharpe 0.5810 vs 0.5809). The 0.15 weight cap rarely binds at N around 870, consistent with Jagannathan and Ma (2003).
+Constrained and unconstrained MVO produce nearly identical results (Sharpe 0.5810 vs 0.5809). The 0.15 weight cap has little practical effect, as evidenced by the near-identical constrained and unconstrained MVO results (Sharpe 0.5810 vs 0.5809). With around 62 stocks held on average, the implied average weight (~1.6%) is well below the 15% cap.
 
-The underperformance is more likely driven by in-sample fitness noise: with N/T around 14.5, the Sharpe estimated from the rank-deficient covariance matrix is a poor proxy for out-of-sample returns.
+The underperformance is more likely driven by in-sample fitness noise: with N/T around 14.5, the in-sample Sharpe, even with Ledoit-Wolf regularisation, is a poor proxy for out-of-sample returns.
 
 ## K-Sensitivity
 

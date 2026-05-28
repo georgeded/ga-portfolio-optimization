@@ -10,7 +10,7 @@ The result figures and summary tables committed to `results/` were produced from
 
 Place these two files in `data/raw/` before running anything:
 
-- `crsp_returns.csv` - CRSP monthly stock file (CIZ format, 2000–2025). Source: WRDS, under CRSP Annual Update / Stock Version 2 (CIZ) / Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
+- `crsp_returns.csv` - CRSP monthly stock file (CIZ format, 2000-2025). Source: WRDS, under CRSP Annual Update / Stock Version 2 (CIZ) / Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
 - `risk_free_rate.csv` - FRED DTB3 series (3-month T-bill, annual %). Download from FRED and save as-is.
 
 ## Full reproduction order
@@ -33,7 +33,7 @@ python3 -m src.benchmarks.equal_weight
 # 4. (Optional) re-tune hyperparameters; tuned values are already hardcoded
 python3 -m src.optimization.optuna_tuner
 
-# 5. Full GA run (35–45 minutes on a 16-core machine)
+# 5. Full GA run (35-45 minutes on a 16-core machine)
 python3 -m src.optimization.runner
 
 # 5b. K-sensitivity (each fixed K value run independently)

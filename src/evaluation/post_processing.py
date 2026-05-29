@@ -1,5 +1,3 @@
-"""Post-run checks for GA behaviour, robustness, and transaction costs."""
-
 import numpy as np
 import pandas as pd
 import os
@@ -10,10 +8,10 @@ from src.optimization.genetic_algorithm import K_MIN, K_MAX
 
 # Monthly windows used for the robustness table.
 SUBPERIODS = [
-    ("Pre-GFC",  "2005-01", "2007-12"),
-    ("GFC",      "2008-01", "2009-12"),
+    ("Pre-GFC", "2005-01", "2007-12"),
+    ("GFC", "2008-01", "2009-12"),
     ("Recovery", "2010-01", "2019-12"),
-    ("COVID+",   "2020-01", "2025-12"),
+    ("COVID+", "2020-01", "2025-12"),
 ]
 
 GAMMAS = [0.001, 0.002, 0.003, 0.005, 0.010]
@@ -45,16 +43,14 @@ def k_behavior_summary(ga_results: pd.DataFrame) -> dict:
     }
 
     lines = [
-        "=" * 50,
         "GA Cardinality K: Behaviour Summary",
-        "=" * 50,
-        f"  Mean      : {stats['mean']:.2f}",
-        f"  Std       : {stats['std']:.2f}",
-        f"  Min       : {stats['min']:.0f}",
-        f"  Max       : {stats['max']:.0f}",
-        f"  Median    : {stats['median']:.1f}",
-        f"  % at K=10 : {stats['pct_at_lower_bound']:.1f}%  (lower bound binding)",
-        f"  % at K=30 : {stats['pct_at_upper_bound']:.1f}%  (upper bound binding)",
+        f"Mean: {stats['mean']:.2f}",
+        f"Std: {stats['std']:.2f}",
+        f"Min: {stats['min']:.0f}",
+        f"Max: {stats['max']:.0f}",
+        f"Median: {stats['median']:.1f}",
+        f"% at K=10: {stats['pct_at_lower_bound']:.1f}% (lower bound binding)",
+        f"% at K=30: {stats['pct_at_upper_bound']:.1f}% (upper bound binding)",
     ]
     output = "\n".join(lines)
     print(output)
@@ -63,18 +59,18 @@ def k_behavior_summary(ga_results: pd.DataFrame) -> dict:
         f.write(output + "\n")
 
     rename_map = {
-        "mean":               "Mean K",
-        "std":                "Std K",
-        "min":                "Min",
-        "max":                "Max",
-        "median":             "Median K",
+        "mean": "Mean K",
+        "std": "Std K",
+        "min": "Min",
+        "max": "Max",
+        "median": "Median K",
         "pct_at_lower_bound": "% at K=10",
         "pct_at_upper_bound": "% at K=30",
     }
     pd.DataFrame([stats]).to_csv(f"{TABLE_DIR}/T8_k_behavior.csv", index=False)
     df_k = pd.DataFrame([stats]).rename(columns=rename_map).round(2)
     to_png(df_k, f"{TABLE_DIR}/T8_k_behavior.png")
-    print(f"  Saved -> {OUTPUT_DIR}/k_behavior.txt | {TABLE_DIR}/T8_k_behavior.csv + .png\n")
+    print(f"Saved: {OUTPUT_DIR}/k_behavior.txt | {TABLE_DIR}/T8_k_behavior.csv + .png\n")
 
     return stats
 
@@ -97,9 +93,7 @@ def subperiod_robustness(results: dict) -> pd.DataFrame:
     table.index.name = "Subperiod"
 
     header = "\n".join([
-        "=" * 70,
         "Subperiod Robustness: Net Sharpe Ratio",
-        "=" * 70,
     ])
     print(header)
     print(table.to_string())
@@ -110,7 +104,7 @@ def subperiod_robustness(results: dict) -> pd.DataFrame:
         f.write(header + "\n")
         f.write(table.to_string() + "\n")
     to_png(table.round(4), f"{TABLE_DIR}/T6_subperiod_robustness.png")
-    print(f"  Saved -> {OUTPUT_DIR}/subperiod_robustness.txt | {TABLE_DIR}/T6_subperiod_robustness.csv + .png\n")
+    print(f"Saved: {OUTPUT_DIR}/subperiod_robustness.txt | {TABLE_DIR}/T6_subperiod_robustness.csv + .png\n")
 
     return table
 
@@ -131,10 +125,8 @@ def transaction_cost_sensitivity(results: dict) -> pd.DataFrame:
     table.index.name = "Gamma"
 
     header = "\n".join([
-        "=" * 70,
         "Transaction-Cost Sensitivity: Net Sharpe Ratio",
-        f"  (baseline gamma = {TRANSACTION_COST})",
-        "=" * 70,
+        f"baseline gamma = {TRANSACTION_COST}",
     ])
     print(header)
     print(table.to_string())
@@ -145,7 +137,7 @@ def transaction_cost_sensitivity(results: dict) -> pd.DataFrame:
         f.write(header + "\n")
         f.write(table.to_string() + "\n")
     to_png(table.round(4), f"{TABLE_DIR}/T7_tc_sensitivity.png")
-    print(f"  Saved -> {OUTPUT_DIR}/tc_sensitivity.txt | {TABLE_DIR}/T7_tc_sensitivity.csv + .png\n")
+    print(f"Saved: {OUTPUT_DIR}/tc_sensitivity.txt | {TABLE_DIR}/T7_tc_sensitivity.csv + .png\n")
 
     return table
 
@@ -170,11 +162,11 @@ if __name__ == "__main__":
     if results["GA"]["date"].dt.tz is not None:
         results["GA"]["date"] = results["GA"]["date"].dt.tz_localize(None)
     print(
-        f"GA date range : {results['GA']['date'].min().date()} -> "
+        f"GA date range: {results['GA']['date'].min().date()} to "
         f"{results['GA']['date'].max().date()}"
     )
-    print(f"GA date dtype  : {results['GA']['date'].dtype}")
-    print(f"GA rows        : {len(results['GA'])}\n")
+    print(f"GA date dtype: {results['GA']['date'].dtype}")
+    print(f"GA rows: {len(results['GA'])}\n")
 
     k_behavior_summary(results["GA"])
     subperiod_robustness(results)

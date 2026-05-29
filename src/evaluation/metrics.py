@@ -1,6 +1,5 @@
-"""
-Monthly returns throughout. Annualization: returns x 12, vol x sqrt(12), Sharpe = ann. excess / ann. vol.
-"""
+# Performance metrics for monthly excess returns.
+# Annualization uses mean * 12 and volatility * sqrt(12).
 
 import pandas as pd
 import numpy as np
@@ -11,18 +10,15 @@ TRANSACTION_COST = 0.003  # gamma = 0.3%
 
 
 def annualized_return(excess_returns: np.ndarray) -> float:
-    """Annualized mean excess return (mean * 12)."""
     return float(np.mean(excess_returns) * ANNUALIZATION_FACTOR)
 
 
 def annualized_volatility(excess_returns: np.ndarray) -> float:
-    """Annualized std of excess returns (ddof=1, * sqrt(12)). Clamped to 0 against float noise."""
     vol = float(np.std(excess_returns, ddof=1) * SQRT_12)
     return max(vol, 0.0)
 
 
 def sharpe_ratio(excess_returns: np.ndarray) -> float:
-    """Input is already excess returns. Returns 0.0 when vol < 1e-10."""
     vol = annualized_volatility(excess_returns)
     if vol < 1e-10:
         return 0.0
@@ -30,7 +26,7 @@ def sharpe_ratio(excess_returns: np.ndarray) -> float:
 
 
 def sortino_ratio(excess_returns: np.ndarray) -> float:
-    """Downside deviation uses returns below zero (below risk-free). Returns 0.0 if no downside."""
+    # Downside deviation uses returns below zero.
     downside = excess_returns[excess_returns < 0]
     if len(downside) == 0:
         return 0.0
@@ -41,35 +37,31 @@ def sortino_ratio(excess_returns: np.ndarray) -> float:
 
 
 def max_drawdown(cumulative_returns: np.ndarray) -> float:
-    """Largest peak-to-trough loss. Returns negative fraction (e.g. -0.45 = -45%)."""
     peak = np.maximum.accumulate(cumulative_returns)
     drawdown = (cumulative_returns - peak) / peak
     return float(np.min(drawdown))
 
 
 def compute_cumulative_returns(excess_returns: np.ndarray, rf: np.ndarray) -> np.ndarray:
-    """Compound (excess_ret + rf) into a wealth index starting at 1.0."""
+    # Compound total returns into a wealth index starting at 1.0.
     total_returns = excess_returns + rf
     return np.cumprod(1 + total_returns)
 
 
 def portfolio_turnover(weights_current: np.ndarray, weights_previous: np.ndarray) -> float:
-    """sum(|w_t - w_{t-1}|) / 2 where w_{t-1} is the post-drift weight before rebalancing."""
     return float(np.sum(np.abs(weights_current - weights_previous)) / 2)
 
 
 def transaction_cost(turnover: float, gamma: float = TRANSACTION_COST) -> float:
-    """gamma * turnover."""
     return float(gamma * turnover)
 
 
 def net_return(gross_return: float, turnover: float, gamma: float = TRANSACTION_COST) -> float:
-    """gross_return - gamma * turnover."""
     return gross_return - transaction_cost(turnover, gamma)
 
 
 def herfindahl_index(weights: np.ndarray) -> float:
-    """HHI = sum(w_i^2). Range: [1/K, 1.0] for equal-weight to single-asset."""
+    # HHI = sum(w_i^2).
     return float(np.sum(weights ** 2))
 
 
@@ -79,7 +71,6 @@ def compute_all_metrics(
     turnovers: np.ndarray,
     gamma: float = TRANSACTION_COST,
 ) -> dict:
-    """Returns annualized gross and net performance metrics as a dict."""
     costs = np.array([transaction_cost(to, gamma) for to in turnovers])
     net_excess = excess_returns - costs
 
@@ -87,14 +78,14 @@ def compute_all_metrics(
     cumulative_net = compute_cumulative_returns(net_excess, rf)
 
     return {
-        # gross (before costs)
+        # Before transaction costs.
         "sharpe_gross": sharpe_ratio(excess_returns),
         "sortino_gross": sortino_ratio(excess_returns),
         "ann_return_gross": annualized_return(excess_returns),
         "ann_vol": annualized_volatility(excess_returns),
         "max_drawdown_gross": max_drawdown(cumulative),
 
-        # net (after costs), primary reported metrics
+        # After transaction costs. These are the main reported metrics.
         "sharpe_net": sharpe_ratio(net_excess),
         "sortino_net": sortino_ratio(net_excess),
         "ann_return_net": annualized_return(net_excess),
@@ -107,7 +98,6 @@ def compute_all_metrics(
 
 
 def format_metrics(metrics: dict) -> pd.DataFrame:
-    """Format the metrics dict into a single-row DataFrame for Table 1."""
     display_names = {
         "ann_return_net": "Annualized Return (net)",
         "ann_vol": "Annualized Volatility",

@@ -1,13 +1,7 @@
-"""
-GA hyperparameter tuner (Optuna, TPE sampler).
-Tuning period: Jan 2005 - Dec 2012 (96 periods).
-Objective: maximise net Sharpe on the tuning period.
-Parameters: PC -> [0.60, 0.95], PM -> [0.01, 0.30], SIGMA_M -> [0.01, 0.15], LAMBDA -> [0.00, 2.00].
-
-python3 -m src.optimization.optuna_tuner (15 trials)
-python3 -m src.optimization.optuna_tuner --debug  (5 trials, 3 runs, 30 gens, 12 periods)
-Resume: SQLite storage auto-resumes.
-"""
+# GA hyperparameter tuner using Optuna.
+# Tuning period: Jan 2005 to Dec 2012.
+# Usage: python3 -m src.optimization.optuna_tuner
+# Debug: python3 -m src.optimization.optuna_tuner --debug
 
 import argparse
 import json
@@ -52,9 +46,7 @@ STUDY_DB = os.path.join(OUTPUT_DIR, "study.db")
 BEST_PARAMS = os.path.join(OUTPUT_DIR, "best_params.json")
 
 
-# module-level for pickling
 def _run_single(args: tuple) -> np.ndarray:
-    """Run one GA trial with the given params."""
     n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_ = args
 
     ga_module.N_GENS = n_gens
@@ -80,10 +72,7 @@ def _eval_period(
     pool: Pool,
     gamma: float,
 ) -> tuple[dict | None, np.ndarray | None, list | None]:
-    """Evaluate one period under given hyperparameters.
-    Mirrors runner.py: canonical by median in-sample fitness; pw_aligned + lambda_ passed
-    to ga_fitness so the penalty matches what GA workers optimised against.
-    """
+    # Evaluate one period under the given hyperparameters.
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
         return None, prev_weights, prev_permnos
@@ -158,7 +147,6 @@ def _make_objective(
     n_workers: int,
     gamma: float,
 ):
-    """One pool per trial, reused across all periods."""
     def objective(trial: optuna.Trial) -> float:
         pc = trial.suggest_float("pc", 0.60, 0.95)
         pm = trial.suggest_float("pm", 0.01, 0.30)
@@ -217,15 +205,12 @@ def tune_for_period(
     n_gens: int = N_GENS_TUNE,
     gamma: float = TRANSACTION_COST,
 ) -> dict:
-    """Tune GA hyperparameters on the rolling window before the current period.
-    Walk-forward tuning so params are always tuned on past data only.
-    warm_start_params seeds the first trial with the previous period's best.
-    """
+    # Tune GA hyperparameters on past data only.
     if len(tuning_dates) < 12:
-        # not enough history to tune, return defaults rather than garbage params
+        # Not enough history to tune.
         return {
-            "pc":      ga_module.PC,
-            "pm":      ga_module.PM,
+            "pc": ga_module.PC,
+            "pm": ga_module.PM,
             "sigma_m": ga_module.SIGMA_M,
             "lambda_": ga_module.LAMBDA,
         }
@@ -243,7 +228,7 @@ def tune_for_period(
         prev_weights = None
         prev_permnos = None
 
-        # sequential evaluation, no pool to avoid nesting under runner's pool
+        # This path can run inside the main runner.
         for t in tuning_dates:
             apply_dates = [
                 d for d in all_return_dates
@@ -262,8 +247,7 @@ def tune_for_period(
 
             n_assets = len(valid_permnos)
             if prev_weights is not None and prev_permnos is not None:
-                # pw_raw for turnover, unrenormalized so exit cost is included naturally
-                # pw_aligned for GA prev_weights (renormalized to sum to 1)
+                # Use raw weights for turnover and aligned weights for GA fitness.
                 pw_raw = (pd.Series(prev_weights, index=prev_permnos)
                           .reindex(valid_permnos, fill_value=0.0)
                           .values)
@@ -276,7 +260,7 @@ def tune_for_period(
                 pw_raw = None
                 pw_aligned = None
 
-            # one GA run per period keeps tuning fast enough to run every month
+            # One GA run per period keeps tuning manageable.
             ga_module.N_GENS = n_gens
             ga_module.PC = pc
             ga_module.PM = pm
@@ -316,13 +300,12 @@ def tune_for_period(
         pruner=pruner,
     )
 
-    # enqueue warm-start so the first trial revisits last period's best params
     if warm_start_params is not None:
         study.enqueue_trial(warm_start_params)
     else:
         study.enqueue_trial({
-            "pc":      ga_module.PC,
-            "pm":      ga_module.PM,
+            "pc": ga_module.PC,
+            "pm": ga_module.PM,
             "sigma_m": ga_module.SIGMA_M,
             "lambda_": ga_module.LAMBDA,
         })
@@ -339,7 +322,6 @@ def run_tuner(
     max_periods: int | None = None,
     gamma: float = TRANSACTION_COST,
 ) -> dict:
-    """Run Optuna search and return best hyperparameter dict."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     universe, returns = load_data()
@@ -356,11 +338,11 @@ def run_tuner(
 
     n_workers = min(n_runs, mp.cpu_count())
 
-    print(f"Tuning period : {tuning_dates[0].date()} to {tuning_dates[-1].date()}")
-    print(f"Periods       : {len(tuning_dates)}")
-    print(f"Trials        : {n_trials}")
-    print(f"Runs/period   : {n_runs}  |  Max gens: {n_gens}  |  Workers: {n_workers}")
-    print(f"Storage       : {STUDY_DB}")
+    print(f"Tuning period: {tuning_dates[0].date()} to {tuning_dates[-1].date()}")
+    print(f"Periods: {len(tuning_dates)}")
+    print(f"Trials: {n_trials}")
+    print(f"Runs/period: {n_runs} | Max gens: {n_gens} | Workers: {n_workers}")
+    print(f"Storage: {STUDY_DB}")
     print()
 
     study = optuna.create_study(
@@ -391,11 +373,11 @@ def run_tuner(
             study.optimize(objective, n_trials=1, show_progress_bar=False)
             best = study.best_trial
             tqdm.write(
-                f"  Trial {already_done + trial_num + 1:3d} | "
+                f"Trial {already_done + trial_num + 1:3d} | "
                 f"net_sharpe={best.value:.4f} | "
-                f"pc={best.params['pc']:.3f}  "
-                f"pm={best.params['pm']:.3f}  "
-                f"sigma_m={best.params['sigma_m']:.3f}  "
+                f"pc={best.params['pc']:.3f} "
+                f"pm={best.params['pm']:.3f} "
+                f"sigma_m={best.params['sigma_m']:.3f} "
                 f"lambda={best.params['lambda_']:.3f}"
             )
         print(f"\nTuning complete in {(time.time()-t0)/60:.1f} min")
@@ -403,37 +385,34 @@ def run_tuner(
     best_params = study.best_params
     best_value = study.best_value
 
-    print("\n" + "=" * 50)
-    print("BEST HYPERPARAMETERS")
-    print("=" * 50)
-    print(f"Net Sharpe (tuning period) : {best_value:.4f}")
-    print(f"PC                         : {best_params['pc']:.4f}")
-    print(f"PM                         : {best_params['pm']:.4f}")
-    print(f"SIGMA_M                    : {best_params['sigma_m']:.4f}")
-    print(f"LAMBDA                     : {best_params['lambda_']:.4f}")
-    print("=" * 50)
+    print("\nBest hyperparameters")
+    print(f"Net Sharpe (tuning period): {best_value:.4f}")
+    print(f"PC: {best_params['pc']:.4f}")
+    print(f"PM: {best_params['pm']:.4f}")
+    print(f"SIGMA_M: {best_params['sigma_m']:.4f}")
+    print(f"LAMBDA: {best_params['lambda_']:.4f}")
 
     output = {
         "best_net_sharpe_tuning": round(best_value, 6),
-        "pc":                     round(best_params["pc"], 4),
-        "pm":                     round(best_params["pm"], 4),
-        "sigma_m":                round(best_params["sigma_m"], 4),
-        "lambda_":                round(best_params["lambda_"], 4),
-        "tuning_period_start":    TUNE_START,
-        "tuning_period_end":      TUNE_END,
-        "n_trials":               len(study.trials),
-        "n_runs_per_trial":       n_runs,
-        "n_gens_per_trial":       n_gens,
+        "pc": round(best_params["pc"], 4),
+        "pm": round(best_params["pm"], 4),
+        "sigma_m": round(best_params["sigma_m"], 4),
+        "lambda_": round(best_params["lambda_"], 4),
+        "tuning_period_start": TUNE_START,
+        "tuning_period_end": TUNE_END,
+        "n_trials": len(study.trials),
+        "n_runs_per_trial": n_runs,
+        "n_gens_per_trial": n_gens,
     }
     with open(BEST_PARAMS, "w") as f:
         json.dump(output, f, indent=2)
 
     print(f"\nSaved to {BEST_PARAMS}")
     print("\nNext: patch into src/optimization/genetic_algorithm.py:")
-    print(f"  PC      = {output['pc']}")
-    print(f"  PM      = {output['pm']}")
-    print(f"  SIGMA_M = {output['sigma_m']}")
-    print(f"  LAMBDA  = {output['lambda_']}")
+    print(f"PC = {output['pc']}")
+    print(f"PM = {output['pm']}")
+    print(f"SIGMA_M = {output['sigma_m']}")
+    print(f"LAMBDA = {output['lambda_']}")
     print("Then run: python3 -m src.optimization.runner")
 
     return best_params

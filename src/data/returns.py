@@ -1,15 +1,9 @@
-"""
-Merges CRSP returns with rf to compute monthly excess returns (MthRet - rf).
-Output used by GA, MVO, 1/N, and evaluation modules.
-"""
-
 import pandas as pd
 import numpy as np
 import os
 
 
 def load_universe(path: str = "data/processed/universe.parquet") -> pd.DataFrame:
-    """Load the eligible universe (permno + date pairs)."""
     df = pd.read_parquet(path)
     df["date"] = pd.to_datetime(df["date"])
     print(f"Universe loaded: {len(df):,} rows, "
@@ -19,24 +13,18 @@ def load_universe(path: str = "data/processed/universe.parquet") -> pd.DataFrame
 
 
 def load_crsp(path: str = "data/raw/crsp_returns.parquet") -> pd.DataFrame:
-    """Load processed CRSP returns."""
     df = pd.read_parquet(path)
     df["date"] = pd.to_datetime(df["date"])
     return df
 
 
 def load_rf(path: str = "data/processed/risk_free_rate.parquet") -> pd.DataFrame:
-    """Load monthly risk-free rate."""
     df = pd.read_parquet(path)
     df["date"] = pd.to_datetime(df["date"])
     return df
 
 
 def compute_excess_returns(universe: pd.DataFrame, crsp: pd.DataFrame, rf: pd.DataFrame) -> pd.DataFrame:
-    """
-    CRSP dates are end-of-month (e.g. 2005-01-31); FRED dates are start-of-month.
-    Matched on year-month period, same calendar month, different day convention.
-    """
     crsp = crsp.copy()
     crsp["year_month"] = crsp["date"].dt.to_period("M")
     rf = rf.copy()
@@ -60,7 +48,6 @@ def compute_excess_returns(universe: pd.DataFrame, crsp: pd.DataFrame, rf: pd.Da
 
 
 def validate_excess_returns(df: pd.DataFrame) -> None:
-    """Sanity checks on excess returns."""
     print("\nValidation")
 
     missing_rf = df["rf"].isna().sum()
@@ -68,10 +55,10 @@ def validate_excess_returns(df: pd.DataFrame) -> None:
     print("No missing risk-free rate values")
 
     print("Excess return stats:")
-    print(f"  Mean  : {df['excess_ret'].mean():.4f}")
-    print(f"  Std   : {df['excess_ret'].std():.4f}")
-    print(f"  Min   : {df['excess_ret'].min():.4f}")
-    print(f"  Max   : {df['excess_ret'].max():.4f}")
+    print(f"Mean: {df['excess_ret'].mean():.4f}")
+    print(f"Std: {df['excess_ret'].std():.4f}")
+    print(f"Min: {df['excess_ret'].min():.4f}")
+    print(f"Max: {df['excess_ret'].max():.4f}")
 
     print(f"Date range: {df['date'].min().date()} "
           f"to {df['date'].max().date()}")

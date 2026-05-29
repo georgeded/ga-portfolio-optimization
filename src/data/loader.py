@@ -1,23 +1,17 @@
-"""
-Load raw CRSP monthly data (CIZ format) from WRDS and save as parquet.
-WRDS source: CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File.
-Date range: 2000-01-01 to 2025-12-31.
-"""
+# Input: data/raw/crsp_returns.csv
 
 import pandas as pd
 import os
 
 
 def load_crsp_csv(path: str = "data/raw/crsp_returns.csv") -> pd.DataFrame:
-    """Load raw CRSP CSV from WRDS; standardise column names and deduplicate."""
     print(f"Loading CRSP data from {path}...")
 
-    # parse_dates uses the original column name before the lowercase conversion below
+    # parse_dates uses the original column name before lowercase conversion.
     df = pd.read_csv(path, parse_dates=["MthCalDt"], low_memory=False)
     df.columns = df.columns.str.lower()
 
-    # Deduplicate before rename (WRDS warning: rare duplicates from
-    # multiple distribution events in same month)
+    # Rare WRDS duplicates can come from multiple distributions in one month.
     before = len(df)
     df = df.drop_duplicates(subset=['permno', 'mthcaldt'], keep='first')
     removed = before - len(df)
@@ -40,7 +34,6 @@ def load_crsp_csv(path: str = "data/raw/crsp_returns.csv") -> pd.DataFrame:
 
 
 def validate_raw_data(df: pd.DataFrame) -> None:
-    """Sanity checks on raw data before any filtering."""
     print("\nValidation")
 
     print(f"Date range: {df['date'].min().date()} "

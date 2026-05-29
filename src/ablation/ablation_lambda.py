@@ -1,19 +1,7 @@
-#!/usr/bin/env python3
-"""
-Lambda=0 ablation.
-
-Runs the full 252-period GA with lambda=0 (no turnover penalty),
-then compares against the main tuned run (lambda=1.8437) and
-produces a summary table.
-
-Runtime: approx. 35 minutes for the GA run.
-
-Usage: python3 -m src.ablation.ablation_lambda
-"""
-
 import os
 
 import matplotlib
+# Use non-interactive backend for PNG output.
 matplotlib.use("Agg")
 import pandas as pd
 
@@ -34,19 +22,17 @@ def metrics_row(df: pd.DataFrame, label: str) -> dict:
         TRANSACTION_COST,
     )
     return {
-        "Lambda":       label,
+        "Lambda": label,
         "Sharpe (net)": round(m["sharpe_net"], 4),
-        "Ann Return":   f"{m['ann_return_net'] * 100:.2f}%",
-        "Ann Vol":      f"{m['ann_vol'] * 100:.2f}%",
+        "Ann Return": f"{m['ann_return_net'] * 100:.2f}%",
+        "Ann Vol": f"{m['ann_vol'] * 100:.2f}%",
         "Max Drawdown": f"{m['max_drawdown_net'] * 100:.2f}%",
         "Avg Turnover": f"{m['avg_turnover'] * 100:.2f}%",
-        "Avg K":        round(float(df["n_stocks"].mean()), 1),
+        "Avg K": round(float(df["n_stocks"].mean()), 1),
     }
 
 
 def _is_complete(path: str, expected_rows: int = 252) -> bool:
-    """Return True if the parquet exists, has the expected number of rows,
-    and covers at least Jan 2005 to Dec 2025."""
     if not os.path.exists(path):
         return False
     try:
@@ -79,7 +65,7 @@ def main():
         df_lam0 = run(
             lambda_val=0.0,
             output_path=lam0_path,
-            clear_checkpoint=True,  # avoid resuming main-GA checkpoint with wrong lambda
+            clear_checkpoint=True,  # Do not reuse the main GA checkpoint.
         )
 
     print("Loading main GA results ...")

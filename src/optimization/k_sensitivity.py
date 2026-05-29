@@ -1,16 +1,3 @@
-"""
-K-sensitivity analysis: runs the GA with fixed cardinality K for each
-value in K_VALUES = [10, 15, 20, 25, 30].
-
-Uses the tuned hyperparameters already stored in genetic_algorithm.py
-(no Optuna tuning per period) so that K is the only variable that
-changes between runs.
-
-python3 -m src.optimization.k_sensitivity           (all K values)
-python3 -m src.optimization.k_sensitivity --k 15   (single K value)
-python3 -m src.optimization.k_sensitivity --k 15 --n-runs 4 --n-gens 100
-"""
-
 import argparse
 import multiprocessing as mp
 import os
@@ -44,7 +31,6 @@ OUTPUT_DIR = "results/k_sensitivity"
 
 
 def _set_affinity(core_id: int) -> None:
-    """Try to pin this worker to one CPU core."""
     try:
         allowed = sorted(os.sched_getaffinity(0))
         cpu = allowed[core_id % len(allowed)]
@@ -54,11 +40,6 @@ def _set_affinity(core_id: int) -> None:
 
 
 def _run_single_fixed_k(args: tuple) -> np.ndarray:
-    """Run one GA instance with K fixed at exactly k_min=k_max.
-
-    K_MIN and K_MAX are passed through the args tuple so the constraint
-    works on both fork-based (Linux) and spawn-based (Windows/macOS) processes.
-    """
     (n_assets, mu, sigma, prev_weights, seed, n_gens,
      pc, pm, sigma_m, lambda_, k_min, k_max) = args
 
@@ -94,13 +75,6 @@ def _process_period_k(
     params: dict,
     k: int,
 ) -> tuple[dict | None, np.ndarray | None, list | None]:
-    """Process one rebalancing period with K fixed at exactly k.
-
-    Mirrors runner._process_period with two differences:
-    - k_min and k_max are passed through the args tuple to each worker
-      so the cardinality constraint is enforced regardless of platform.
-    - No Optuna tuning: params come directly from the caller.
-    """
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if not eligible:
         return None, prev_weights, prev_permnos
@@ -161,20 +135,20 @@ def _process_period_k(
     net_excess = portfolio_excess - cost
 
     result = {
-        "date":           apply_date,
-        "n_stocks":       int((canon_w > 0).sum()),
-        "portfolio_ret":  portfolio_gross,
-        "excess_ret":     portfolio_excess,
-        "rf":             rf,
+        "date": apply_date,
+        "n_stocks": int((canon_w > 0).sum()),
+        "portfolio_ret": portfolio_gross,
+        "excess_ret": portfolio_excess,
+        "rf": rf,
         "net_excess_ret": net_excess,
-        "turnover":       turnover,
-        "cost":           cost,
-        "hhi":            herfindahl_index(canon_w),
-        "gross_ret_std":  float(np.std(gross_returns)),
-        "gross_ret_iqr":  float(np.percentile(gross_returns, 75) -
+        "turnover": turnover,
+        "cost": cost,
+        "hhi": herfindahl_index(canon_w),
+        "gross_ret_std": float(np.std(gross_returns)),
+        "gross_ret_iqr": float(np.percentile(gross_returns, 75) -
                                np.percentile(gross_returns, 25)),
-        "gross_ret_min":  float(np.min(gross_returns)),
-        "gross_ret_max":  float(np.max(gross_returns)),
+        "gross_ret_min": float(np.min(gross_returns)),
+        "gross_ret_max": float(np.max(gross_returns)),
     }
 
     new_weights = compute_drift_weights(canon_w, stock_rets)
@@ -190,8 +164,6 @@ def run_fixed_k(
     universe: pd.DataFrame | None = None,
     returns: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Run the GA with K fixed at exactly k stocks per period, using module-level
-    hyperparameters so K is the only variable between runs."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     orig_k_min = ga_module.K_MIN
@@ -243,11 +215,11 @@ def run_fixed_k(
 
                 results.append(result)
                 tqdm.write(
-                    f"  {apply_date.date()} | "
-                    f"ret={result['portfolio_ret']*100:+.2f}%  "
-                    f"excess={result['excess_ret']*100:+.2f}%  "
-                    f"turnover={result['turnover']*100:.1f}%  "
-                    f"K_actual={result['n_stocks']}  "
+                    f"{apply_date.date()} | "
+                    f"ret={result['portfolio_ret']*100:+.2f}% "
+                    f"excess={result['excess_ret']*100:+.2f}% "
+                    f"turnover={result['turnover']*100:.1f}% "
+                    f"K_actual={result['n_stocks']} "
                     f"({elapsed:.1f}s)",
                     file=sys.stderr,
                 )
@@ -275,11 +247,6 @@ def run_all_k(
     n_gens: int = 200,
     gamma: float = TRANSACTION_COST,
 ) -> dict:
-    """Run all K values sequentially. Returns {k: DataFrame}.
-
-    Loads universe and returns once and passes them to each run_fixed_k
-    call to avoid redundant I/O across the five K values.
-    """
     results = {}
     t0_total = time.time()
 
@@ -287,9 +254,7 @@ def run_all_k(
     shared_universe, shared_returns = load_data()
 
     for k in K_VALUES:
-        print(f"\n{'='*60}")
-        print(f"Running K={k}  (run {K_VALUES.index(k)+1}/{len(K_VALUES)})")
-        print(f"{'='*60}")
+        print(f"\nRunning K={k} ({K_VALUES.index(k)+1}/{len(K_VALUES)})")
         t0 = time.time()
         results[k] = run_fixed_k(
             k,

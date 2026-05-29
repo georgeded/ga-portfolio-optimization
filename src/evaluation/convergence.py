@@ -1,10 +1,3 @@
-"""
-Figure A1 - GA Convergence (Tuned vs Default Parameters).
-Three dates: Jan 2007 (pre-crisis), Jan 2010 (post-crisis), Jan 2020 (recent).
-N_RUNS_CONV=8 independent runs; fitness = pure in-sample Sharpe (prev_weights=None, lambda inactive).
-Outputs: A1_convergence_tuned.png, A1_convergence_default.png, A1_convergence_comparison.png.
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,18 +9,18 @@ from src.optimization import genetic_algorithm as ga_module
 from src.optimization.genetic_algorithm import run_ga, N_GENS
 
 REPR_DATES = ["2007-01-01", "2010-01-01", "2020-01-01"]
-DATE_LABELS = ["Pre-crisis (Jan 2007)",
-               "Post-crisis (Jan 2010)",
-               "Recent (Jan 2020)"]
+DATE_LABELS = [
+    "Pre-crisis (Jan 2007)",
+    "Post-crisis (Jan 2010)",
+    "Recent (Jan 2020)",
+]
 N_RUNS_CONV = 8
 BASE_SEED = 42
 OUT_DIR = "results/figures"
 TUNED_LABEL = "Tuned (Optuna)"
 
-# Tuned parameters from initial fixed-window Optuna run (2005-2012).
-# The main experiment uses walk-forward per-period tuning, so there
-# is no single canonical tuned set. These values serve as a
-# representative illustration for the convergence diagnostic only.
+# Tuned parameters from the initial fixed-window Optuna run.
+# Used here only for the convergence diagnostic.
 TUNED_PARAMS = {
     "pc": 0.6054,
     "pm": 0.1370,
@@ -36,7 +29,7 @@ TUNED_PARAMS = {
     "label": TUNED_LABEL,
 }
 
-# Standard EA literature defaults
+# Standard EA defaults.
 DEFAULT_PARAMS = {
     "pc": 0.8,
     "pm": 0.1,
@@ -46,14 +39,14 @@ DEFAULT_PARAMS = {
 }
 
 CONFIG_STYLES = {
-    TUNED_LABEL: {"lw": 2.0, "ls": "-",  "alpha_band": 0.15},
-    "Default":   {"lw": 1.6, "ls": "--", "alpha_band": 0.10},
+    TUNED_LABEL: {"lw": 2.0, "ls": "-", "alpha_band": 0.15},
+    "Default": {"lw": 1.6, "ls": "--", "alpha_band": 0.10},
 }
 
 DATE_COLORS = ["#000000", "#555555", "#999999"]
 
-# lambda is inactive and fitness = pure Sharpe, shown in the axis label
-YAXIS_LABEL = "In-sample Sharpe  (prev_weights=None, lambda inactive)"
+# Lambda is inactive because prev_weights=None.
+YAXIS_LABEL = "In-sample Sharpe (prev_weights=None, lambda inactive)"
 
 plt.rcParams.update({
     "figure.dpi": 300,
@@ -74,11 +67,6 @@ plt.rcParams.update({
 
 def run_convergence_for_config(mu: np.ndarray, sigma: np.ndarray,
                                 n_assets: int, params: dict) -> tuple:
-    """
-    Temporarily overrides ga_module constants; restores after run regardless of exceptions.
-    prev_weights=None: lambda inactive, fitness = pure in-sample Sharpe.
-    Returns (median_traj, q25, q75, generations, median_stop).
-    """
     orig_pc = ga_module.PC
     orig_pm = ga_module.PM
     orig_sigma_m = ga_module.SIGMA_M
@@ -109,7 +97,7 @@ def run_convergence_for_config(mu: np.ndarray, sigma: np.ndarray,
         ga_module.SIGMA_M = orig_sigma_m
         ga_module.LAMBDA = orig_lambda
 
-    # Pad shorter runs with their final value after early stopping.
+    # Pad shorter early-stopped runs with their final value.
     max_len = max(len(h) for h in all_histories)
     padded = np.array([
         h + [h[-1]] * (max_len - len(h))
@@ -142,7 +130,7 @@ def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
 
     ax.set_title(
         f"Figure A1: GA Convergence ({config_lbl} Parameters)\n"
-        f"(median ± IQR across {N_RUNS_CONV} independent runs)"
+        f"(median and IQR across {N_RUNS_CONV} independent runs)"
     )
     ax.set_xlabel("Generation")
     ax.set_ylabel(YAXIS_LABEL)
@@ -155,7 +143,6 @@ def plot_single_config(results: dict, config_lbl: str, filename: str) -> None:
 
 
 def plot_comparison(results: dict) -> None:
-    """Tuned vs default overlaid, one subplot per date."""
     fig, axes = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
 
     for i, (date_str, date_label) in enumerate(zip(REPR_DATES, DATE_LABELS)):
@@ -181,7 +168,7 @@ def plot_comparison(results: dict) -> None:
 
     fig.suptitle(
         "Figure A1: GA Convergence: Tuned vs Default Parameters\n"
-        f"(median ± IQR, {N_RUNS_CONV} runs; "
+        f"(median and IQR, {N_RUNS_CONV} runs, "
         "fitness = in-sample Sharpe, lambda inactive)",
         fontsize=12,
     )
@@ -203,9 +190,7 @@ def run_convergence() -> None:
 
     for date_str, date_label in zip(REPR_DATES, DATE_LABELS):
         t = pd.Timestamp(date_str)
-        print(f"\n{'='*60}")
-        print(f"Date: {date_label}")
-        print(f"{'='*60}")
+        print(f"\nDate: {date_label}")
 
         eligible = universe[universe["date"] == t]["permno"].tolist()
         if not eligible:
@@ -222,7 +207,7 @@ def run_convergence() -> None:
 
         for params in [TUNED_PARAMS, DEFAULT_PARAMS]:
             lbl = params["label"]
-            print(f"\n  Running {lbl} "
+            print(f"\nRunning {lbl} "
                   f"(pc={params['pc']}, pm={params['pm']}, "
                   f"sigma_m={params['sigma_m']}) "
                   f"[lambda inactive, prev_weights=None]...")
@@ -234,13 +219,12 @@ def run_convergence() -> None:
                 median_traj, q25, q75, generations, median_stop
             )
 
-            print(f"    Median final fitness : {median_traj[-1]:.4f}")
-            print(f"    Median stopping gen  : {median_stop} / {N_GENS}")
-            print(f"    IQR at final gen     : "
+            print(f"Median final fitness: {median_traj[-1]:.4f}")
+            print(f"Median stopping gen: {median_stop} / {N_GENS}")
+            print(f"IQR at final gen: "
                   f"[{q25[-1]:.4f}, {q75[-1]:.4f}]")
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    print(f"\n{'='*60}")
     print("Saving figures...")
 
     plot_single_config(results, TUNED_PARAMS["label"],

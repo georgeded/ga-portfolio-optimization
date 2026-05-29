@@ -1,14 +1,3 @@
-"""
-K-sensitivity figures (RQ3): effect of fixed cardinality K on
-Sharpe ratio, turnover, and diversification.
-
-Produces two figures:
-  F_K1: three-panel Sharpe / Turnover / HHI vs K with error bars
-  F_K2: cumulative net returns for all K values on one plot
-
-python3 -m src.evaluation.k_sensitivity_figures
-"""
-
 import os
 
 import matplotlib.lines as mlines
@@ -19,24 +8,24 @@ import pandas as pd
 from src.optimization.k_sensitivity import K_VALUES, OUTPUT_DIR
 
 plt.rcParams.update({
-    "figure.dpi":        300,
-    "font.family":       "serif",
-    "font.size":         11,
-    "axes.titlesize":    12,
-    "axes.labelsize":    11,
-    "legend.fontsize":   10,
-    "xtick.labelsize":   10,
-    "ytick.labelsize":   10,
-    "axes.spines.top":   False,
+    "figure.dpi": 300,
+    "font.family": "serif",
+    "font.size": 11,
+    "axes.titlesize": 12,
+    "axes.labelsize": 11,
+    "legend.fontsize": 10,
+    "xtick.labelsize": 10,
+    "ytick.labelsize": 10,
+    "axes.spines.top": False,
     "axes.spines.right": False,
-    "axes.grid":         True,
-    "grid.alpha":        0.3,
-    "grid.linestyle":    "--",
+    "axes.grid": True,
+    "grid.alpha": 0.3,
+    "grid.linestyle": "--",
 })
 
-# Grayscale palette: darkest for K=10, lightest for K=30
+# Darkest for K=10, lightest for K=30.
 _GRAYS = ["#000000", "#333333", "#666666", "#999999", "#bbbbbb"]
-# Line styles for additional distinction in B&W print
+# Different line styles help in grayscale print.
 _LINESTYLES = ["-", "--", "-.", ":", (0, (3, 1, 1, 1))]
 
 K_STYLES = {
@@ -58,7 +47,6 @@ def add_caption(fig, text: str) -> None:
 
 
 def load_k_results(k_values: list = K_VALUES) -> dict:
-    """Load parquets for all K values. Raises if a file is missing."""
     data = {}
     for k in k_values:
         path = os.path.join(OUTPUT_DIR, f"k{k:02d}_results.parquet")
@@ -80,7 +68,6 @@ def cumulative_returns(df: pd.DataFrame) -> np.ndarray:
 
 
 def _rolling_sharpe_series(net: np.ndarray, window: int = 12) -> np.ndarray:
-    """Annualized rolling Sharpe over a trailing window. Returns non-NaN values."""
     s = pd.Series(net)
     mu = s.rolling(window).mean() * 12
     vol = s.rolling(window).std(ddof=1) * SQRT_12
@@ -89,7 +76,6 @@ def _rolling_sharpe_series(net: np.ndarray, window: int = 12) -> np.ndarray:
 
 
 def _rolling_mean_series(values: np.ndarray, window: int = 12) -> np.ndarray:
-    """Rolling mean over a trailing window. Returns non-NaN values."""
     return pd.Series(values).rolling(window).mean().dropna().values
 
 
@@ -101,11 +87,6 @@ def compute_sharpe_net(df: pd.DataFrame) -> float:
 
 
 def plot_fk1(data: dict) -> None:
-    """Three-panel figure: net Sharpe, avg turnover, avg HHI vs K.
-
-    Central value: full-period metric.
-    Error bar half-width: std of rolling 12-month estimates across periods.
-    """
     k_list = sorted(data.keys())
     sharpes = []
     sharpe_e = []
@@ -132,7 +113,7 @@ def plot_fk1(data: dict) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
 
     panel_data = [
-        (axes[0], sharpes,    sharpe_e,   "Net Sharpe Ratio (annualized)",
+        (axes[0], sharpes, sharpe_e, "Net Sharpe Ratio (annualized)",
          "Figure K1a: Sharpe vs K"),
         (axes[1], [t * 100 for t in turnovers],
                   [e * 100 for e in turnover_e],
@@ -169,7 +150,7 @@ def plot_fk1(data: dict) -> None:
         "Effect of fixed cardinality K on net Sharpe ratio, average monthly "
         "turnover, and portfolio concentration (HHI). All models use fixed "
         "hyperparameters (pc=0.6054, pm=0.1370, sigma_m=0.1469, lambda=1.8437) "
-        "to isolate the effect of K. Error bars show ±1 std of the "
+        "to isolate the effect of K. Error bars show one standard deviation of the "
         "rolling 12-month estimates across periods."
     )
     add_caption(fig, caption_text)
@@ -182,7 +163,6 @@ def plot_fk1(data: dict) -> None:
 
 
 def plot_fk2(data: dict) -> None:
-    """Cumulative net portfolio value for all K values on one plot."""
     fig, ax = plt.subplots(figsize=(10, 5))
 
     for k in sorted(data.keys()):

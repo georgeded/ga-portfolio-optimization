@@ -1,13 +1,10 @@
-"""
-Genetic Algorithm for cardinality-constrained portfolio optimization.
-Chromosome: real-valued weight vector of length N (universe size).
-Exactly K entries are non-zero, with w_i in [W_MIN, W_MAX] summing to 1.
-"""
+# Genetic algorithm for cardinality-constrained portfolios.
+# Chromosomes are full-universe weight vectors with K active assets.
 
 import numpy as np
 from src.evaluation.metrics import portfolio_turnover
 
-# not tuned by Optuna
+# Fixed experiment constraints, not tuned by Optuna.
 K_MIN = 10
 K_MAX = 30
 W_MIN = 0.02
@@ -27,8 +24,8 @@ LAMBDA = 1.8437
 
 DEBUG = False
 
+
 def project_bounded_simplex(v, lower, upper, tol=1e-12):
-    """Project weights onto the feasible simplex."""
     v = np.asarray(v, dtype=float)
     n = len(v)
 
@@ -56,7 +53,6 @@ def project_bounded_simplex(v, lower, upper, tol=1e-12):
 
 
 def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.ndarray:
-    """Fix a chromosome so it satisfies all constraints."""
     if depth > 1:
         raise ValueError("Repair recursion exceeded 1 call.")
 
@@ -118,7 +114,6 @@ def repair(weights: np.ndarray, rng: np.random.Generator, depth: int = 0) -> np.
 
 
 def initialize_population(n_assets: int, rng: np.random.Generator) -> np.ndarray:
-    """Random feasible starting population."""
     population = np.zeros((POP_SIZE, n_assets))
 
     for i in range(POP_SIZE):
@@ -133,11 +128,10 @@ def initialize_population(n_assets: int, rng: np.random.Generator) -> np.ndarray
 
     return population
 
+
 def fitness(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
             prev_weights: np.ndarray | None = None, lambda_: float = LAMBDA) -> float:
-    """Sharpe minus turnover penalty."""
-    # using only the held stocks avoids polluting the Sharpe with the
-    # full-universe covariance, zeros in weights contribute nothing but noise
+    # Use held stocks only so zero-weight assets do not add covariance noise.
     held = weights > 0
     if not held.any():
         return 0.0
@@ -164,14 +158,13 @@ def fitness(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
 
 def tournament_select(population: np.ndarray, fitnesses: np.ndarray,
                       rng: np.random.Generator, k: int = TOURNAMENT) -> np.ndarray:
-    """Pick the best member of a random tournament."""
     k = min(k, len(population))
     indices = rng.choice(len(population), size=k, replace=False)
     winner = indices[np.argmax(fitnesses[indices])]
     return population[winner].copy()
 
+
 def _make_child(w1: np.ndarray, w2: np.ndarray, rng: np.random.Generator) -> np.ndarray:
-    """Build one child from the parents' active holdings."""
     N = len(w1)
     union = np.nonzero((w1 > 0) | (w2 > 0))[0]
     if len(union) == 0:
@@ -200,7 +193,6 @@ def _make_child(w1: np.ndarray, w2: np.ndarray, rng: np.random.Generator) -> np.
 
 def crossover(p1: np.ndarray, p2: np.ndarray, rng: np.random.Generator,
               pc: float = PC) -> tuple[np.ndarray, np.ndarray]:
-    """Crossover operator."""
     if rng.random() > pc:
         return p1.copy(), p2.copy()
 
@@ -210,7 +202,6 @@ def crossover(p1: np.ndarray, p2: np.ndarray, rng: np.random.Generator,
 
 
 def mutate(w: np.ndarray, rng: np.random.Generator, pm: float = PM) -> np.ndarray:
-    """Weight noise plus occasional asset swap."""
     w = w.copy()
     gaussian_fired = rng.random() < pm
     swap_fired = rng.random() < pm
@@ -241,7 +232,7 @@ def mutate(w: np.ndarray, rng: np.random.Generator, pm: float = PM) -> np.ndarra
 def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
                  prev_weights: np.ndarray | None, rng: np.random.Generator,
                  lambda_: float = LAMBDA) -> tuple[np.ndarray, float]:
-    """Small greedy weight shifts on the current holdings."""
+    # Small greedy weight shifts on the current holdings.
     w_best = w.copy()
     f_best = fitness(w_best, mu, sigma, prev_weights, lambda_)
 
@@ -252,9 +243,7 @@ def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
 
         i, j = rng.choice(held, size=2, replace=False)
 
-        delta = min(LOCAL_STEP,
-                    w_best[i] - W_MIN,
-                    W_MAX - w_best[j])
+        delta = min(LOCAL_STEP, w_best[i] - W_MIN, W_MAX - w_best[j])
         if delta <= 0:
             continue
 
@@ -273,10 +262,8 @@ def local_refine(w: np.ndarray, mu: np.ndarray, sigma: np.ndarray,
 def run_ga(n_assets: int, mu: np.ndarray, sigma: np.ndarray,
            prev_weights: np.ndarray | None, rng: np.random.Generator,
            return_history: bool = False) -> np.ndarray:
-    """Run the genetic algorithm for one rebalance date."""
     population = initialize_population(n_assets, rng)
-    fitnesses = np.array([
-        fitness(population[i], mu, sigma, prev_weights, LAMBDA)
+    fitnesses = np.array([fitness(population[i], mu, sigma, prev_weights, LAMBDA)
         for i in range(POP_SIZE)
     ])
 

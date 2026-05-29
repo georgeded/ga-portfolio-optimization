@@ -1,8 +1,3 @@
-"""
-Generates Table 1 (performance comparison) and Table 3 (portfolio characteristics)
-as CSV, LaTeX, and PNG.
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -24,13 +19,13 @@ COLUMNS_T1 = [COL_RETURN, COL_VOL, COL_SHARPE, COL_SORTINO,
               COL_MDD, COL_TURNOVER, COL_COST]
 
 COL_LATEX_T1 = {
-    COL_RETURN:   "Ann. Return",
-    COL_VOL:      "Ann. Vol.",
-    COL_SHARPE:   "Sharpe",
-    COL_SORTINO:  "Sortino",
-    COL_MDD:      "Max DD",
+    COL_RETURN: "Ann. Return",
+    COL_VOL: "Ann. Vol.",
+    COL_SHARPE: "Sharpe",
+    COL_SORTINO: "Sortino",
+    COL_MDD: "Max DD",
     COL_TURNOVER: "Turnover",
-    COL_COST:     "Avg Cost",
+    COL_COST: "Avg Cost",
 }
 
 # Table 3
@@ -42,15 +37,14 @@ COL_COST3 = "Avg Transaction Cost"
 COLUMNS_T3 = [COL_K, COL_HHI, COL_TO3, COL_COST3]
 
 COL_LATEX_T3 = {
-    COL_K:     "Avg K",
-    COL_HHI:   "Avg HHI",
-    COL_TO3:   "Turnover",
+    COL_K: "Avg K",
+    COL_HHI: "Avg HHI",
+    COL_TO3: "Turnover",
     COL_COST3: "Avg Cost",
 }
 
 
 def to_png(fmt: pd.DataFrame, path: str, fontsize: int = 10) -> None:
-    """Save a formatted DataFrame as a PNG table image."""
     n_rows, n_cols = fmt.shape
     fig_w = 2 + n_cols * 1.6
     fig_h = 0.5 + n_rows * 0.45
@@ -84,7 +78,6 @@ def to_png(fmt: pd.DataFrame, path: str, fontsize: int = 10) -> None:
 
 
 def compute_table1_metrics(df: pd.DataFrame) -> dict:
-    """Compute all Table 1 metrics for a single strategy."""
     net = df["net_excess_ret"].values
     rf = df["rf"].values
     to = df["turnover"].values
@@ -105,13 +98,13 @@ def compute_table1_metrics(df: pd.DataFrame) -> dict:
     mdd = float(np.min((cum - peak) / peak))
 
     return {
-        COL_RETURN:   ann_ret,
-        COL_VOL:      ann_vol,
-        COL_SHARPE:   sharpe,
-        COL_SORTINO:  sortino,
-        COL_MDD:      mdd,
+        COL_RETURN: ann_ret,
+        COL_VOL: ann_vol,
+        COL_SHARPE: sharpe,
+        COL_SORTINO: sortino,
+        COL_MDD: mdd,
         COL_TURNOVER: float(np.mean(to)),
-        COL_COST:     float(df["cost"].mean()),
+        COL_COST: float(df["cost"].mean()),
     }
 
 
@@ -123,8 +116,8 @@ def build_table1(
 ) -> pd.DataFrame:
 
     strategies = {
-        "GA (adaptive K)":   ga_path,
-        "Constrained MVO":   mvo_con_path,
+        "GA (adaptive K)": ga_path,
+        "Constrained MVO": mvo_con_path,
         "Unconstrained MVO": mvo_unc_path,
         "1/N (~867 stocks)": ew_path,
     }
@@ -162,7 +155,7 @@ def to_latex_t1(fmt: pd.DataFrame) -> str:
     return fmt_latex.to_latex(
         caption=(
             "Main performance comparison (net of transaction costs, "
-            "January 2005--December 2025). "
+            "January 2005 to December 2025). "
             "All metrics computed on monthly net excess returns. "
             "Transaction cost $\\gamma = 0.3\\%$ per unit traded."
         ),
@@ -174,15 +167,12 @@ def to_latex_t1(fmt: pd.DataFrame) -> str:
 
 
 def compute_table3_metrics(df: pd.DataFrame) -> dict:
-    """
-    Compute portfolio characteristics for Table 3.
-    Avg K: for MVO and 1/N this is the eligible universe size (around 870).
-    For the GA, K is chosen adaptively within [10, 30].
-    """
+    # For MVO and 1/N, Avg K is the eligible universe size.
+    # For the GA, K is chosen within [10, 30].
     return {
-        COL_K:     float(df["n_stocks"].mean()),
-        COL_HHI:   float(df["hhi"].mean()),
-        COL_TO3:   float(df["turnover"].mean()),
+        COL_K: float(df["n_stocks"].mean()),
+        COL_HHI: float(df["hhi"].mean()),
+        COL_TO3: float(df["turnover"].mean()),
         COL_COST3: float(df["cost"].mean()),
     }
 
@@ -195,8 +185,8 @@ def build_table3(
 ) -> pd.DataFrame:
 
     strategies = {
-        "GA (adaptive K)":   ga_path,
-        "Constrained MVO":   mvo_con_path,
+        "GA (adaptive K)": ga_path,
+        "Constrained MVO": mvo_con_path,
         "Unconstrained MVO": mvo_unc_path,
         "1/N (~867 stocks)": ew_path,
     }
@@ -230,14 +220,14 @@ def to_latex_t3(fmt: pd.DataFrame) -> str:
     return fmt_latex.to_latex(
         caption=(
             "Portfolio characteristics across strategies "
-            "(January 2005--December 2025). "
+            "(January 2005 to December 2025). "
             "\\textit{Avg K}: average number of stocks held per period. "
             "For the GA, $K \\in [10, 30]$ is enforced by the cardinality constraint "
-            "(adaptive selection); for MVO and 1/N, K reflects the full eligible "
+            "(adaptive selection). For MVO and 1/N, K reflects the full eligible "
             "universe ($\\approx 867$) and is not a design parameter. "
-            "\\textit{HHI}: Herfindahl-Hirschman Index; theoretical minimum is $1/K$, "
+            "\\textit{HHI}: Herfindahl-Hirschman Index. Theoretical minimum is $1/K$, "
             "so values are not directly comparable across strategies with different $K$ "
-            "(GA lower bound $\\approx 0.071$; MVO/1/N lower bound $\\approx 0.001$). "
+            "(GA lower bound $\\approx 0.071$, MVO/1/N lower bound $\\approx 0.001$). "
             "Transaction cost $\\gamma = 0.3\\%$ per unit traded."
         ),
         label="tab:characteristics",

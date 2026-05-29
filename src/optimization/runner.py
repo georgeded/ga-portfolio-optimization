@@ -1,16 +1,6 @@
-"""
-Out-of-sample GA experiment runner (252 monthly periods, Jan 2005 - Dec 2025).
-
-For each period, estimates mu/sigma from the trailing 60-month window,
-runs N_RUNNERS GA instances in parallel, and carries the canonical
-portfolio weights forward into the next period.
-Checkpoints after every period so cloud jobs can resume safely.
-
-python3 -m src.optimization.runner (full run)
-python3 -m src.optimization.runner --debug (3 runs, 50 gens, 10 periods)
-python3 -m src.optimization.runner --clear-checkpoint (restart from scratch)
-python3 -m src.optimization.runner --n-runs 5 --n-gens 100 --max-periods 20
-"""
+# Out-of-sample GA runner.
+# Usage: python3 -m src.optimization.runner
+# Debug: python3 -m src.optimization.runner --debug
 
 import argparse
 import multiprocessing as mp
@@ -49,9 +39,8 @@ FINAL_OUT = os.path.join(OUTPUT_DIR, "ga_results.parquet")
 WEIGHTS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_weights.npy")
 PERMNOS_CHECKPOINT = os.path.join(OUTPUT_DIR, "last_permnos.npy")
 
-# fixed params from initial Optuna tuning (2005-2012, 15 trials).
-# walk-forward per-period tuning was computationally infeasible at
-# about 20 min/period on the available VM within the thesis timeline.
+# Fixed params from the initial Optuna run.
+# Per-period tuning was too slow for the thesis run.
 FIXED_PARAMS = {
     "pc": ga_module.PC,
     "pm": ga_module.PM,
@@ -60,13 +49,11 @@ FIXED_PARAMS = {
 }
 
 
-# module-level for multiprocessing pickling
 def run_single_ga(args: tuple) -> np.ndarray:
-    """args: (n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_)"""
+    # args: (n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_)
     n_assets, mu, sigma, prev_weights, seed, n_gens, pc, pm, sigma_m, lambda_ = args
 
-    # each worker has its own copy of ga_module (separate process), so setting
-    # these globals here is safe and does not affect other workers
+    # Each worker has its own module copy.
     ga_module.N_GENS = n_gens
     ga_module.PC = pc
     ga_module.PM = pm
@@ -78,7 +65,6 @@ def run_single_ga(args: tuple) -> np.ndarray:
 
 
 def set_affinity(core_id: int) -> None:
-    """Try to pin this worker to one CPU core."""
     try:
         allowed = sorted(os.sched_getaffinity(0))
         cpu = allowed[core_id % len(allowed)]
@@ -106,11 +92,10 @@ def _process_period(
     gamma: float,
     params: dict | None = None,
 ) -> tuple[dict, np.ndarray, list]:
-    """Returns (result_row, drifted_weights, permnos) for one rebalancing period."""
     if params is None:
         params = {
-            "pc":      ga_module.PC,
-            "pm":      ga_module.PM,
+            "pc": ga_module.PC,
+            "pm": ga_module.PM,
             "sigma_m": ga_module.SIGMA_M,
             "lambda_": ga_module.LAMBDA,
         }
@@ -179,21 +164,21 @@ def _process_period(
     net_excess = portfolio_excess - cost
 
     result = {
-        "date":           apply_date,
-        "n_stocks":       int((canon_w > 0).sum()),
-        "portfolio_ret":  portfolio_gross,
-        "excess_ret":     portfolio_excess,
-        "rf":             rf,
+        "date": apply_date,
+        "n_stocks": int((canon_w > 0).sum()),
+        "portfolio_ret": portfolio_gross,
+        "excess_ret": portfolio_excess,
+        "rf": rf,
         "net_excess_ret": net_excess,
-        "turnover":       turnover,
-        "cost":           cost,
-        "hhi":            herfindahl_index(canon_w),
+        "turnover": turnover,
+        "cost": cost,
+        "hhi": herfindahl_index(canon_w),
         # Spread across the independent GA runs
-        "gross_ret_std":  float(np.std(gross_returns)),
-        "gross_ret_iqr":  float(np.percentile(gross_returns, 75) -
+        "gross_ret_std": float(np.std(gross_returns)),
+        "gross_ret_iqr": float(np.percentile(gross_returns, 75) -
                                np.percentile(gross_returns, 25)),
-        "gross_ret_min":  float(np.min(gross_returns)),
-        "gross_ret_max":  float(np.max(gross_returns)),
+        "gross_ret_min": float(np.min(gross_returns)),
+        "gross_ret_max": float(np.max(gross_returns)),
     }
 
     new_weights = compute_drift_weights(canon_w, stock_rets)
@@ -204,17 +189,17 @@ def _process_period(
 
 def _save_checkpoint(completed_results: list[dict], prev_weights: np.ndarray,
                      prev_permnos: list) -> None:
-    """Save results parquet + canonical weights state after every period."""
     pd.DataFrame(completed_results).to_parquet(CHECKPOINT, index=False)
     np.save(WEIGHTS_CHECKPOINT, prev_weights)
     np.save(PERMNOS_CHECKPOINT, np.array(prev_permnos, dtype=object))
 
 
 def _load_checkpoint() -> tuple[list[dict], set, np.ndarray | None, list | None]:
-    """Load checkpoint state. prev_weights/prev_permnos are None if weight file is missing."""
+    # prev_weights and prev_permnos are None if weight files are missing.
     ckpt = pd.read_parquet(CHECKPOINT)
     completed_results = ckpt.to_dict("records")
-    # Universe dates are start-of-month; checkpoint dates are apply dates (end-of-month).
+    # Universe dates are start-of-month.
+    # Checkpoint dates are apply dates, usually end-of-month.
     # Compare by (year, month) so the resume logic is not fooled by the day difference.
     completed_dates = {(pd.Timestamp(d).year, pd.Timestamp(d).month)
                        for d in ckpt["date"]}
@@ -229,7 +214,7 @@ def _load_checkpoint() -> tuple[list[dict], set, np.ndarray | None, list | None]
 
 
 def _clear_checkpoint() -> None:
-    """Delete all checkpoint files."""
+    # Delete all checkpoint files.
     # FINAL_OUT intentionally excluded: clearing state should not
     # destroy completed experiment results
     for path in [CHECKPOINT, WEIGHTS_CHECKPOINT, PERMNOS_CHECKPOINT]:
@@ -243,7 +228,6 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
         clear_checkpoint: bool = False,
         lambda_val: float | None = None,
         output_path: str | None = None) -> pd.DataFrame:
-    """Run the full OOS GA experiment with checkpointing. Returns monthly results DataFrame."""
     if lambda_val is not None:
         ga_module.LAMBDA = lambda_val
         FIXED_PARAMS["lambda_"] = lambda_val
@@ -271,9 +255,9 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
             _load_checkpoint()
         print(f"Resuming from checkpoint: {len(completed_results)} periods done.")
         if prev_weights is not None:
-            print("  prev_weights found; turnover will be accurate.")
+            print("prev_weights found. Turnover will be accurate.")
         else:
-            print("  prev_weights not found; first resumed period uses turnover=1.0.")
+            print("prev_weights not found. First resumed period uses turnover=1.0.")
 
     remaining = [t for t in rebalance_dates if (t.year, t.month) not in completed_dates]
     print(f"Periods remaining: {len(remaining)}")
@@ -309,11 +293,11 @@ def run(n_runs: int = N_RUNNERS, n_gens: int = ga_module.N_GENS,
             _save_checkpoint(completed_results, prev_weights, prev_permnos)
 
             tqdm.write(
-                f"  {apply_date.date()} | "
-                f"ret={result['portfolio_ret']*100:+.2f}%  "
-                f"excess={result['excess_ret']*100:+.2f}%  "
-                f"turnover={result['turnover']*100:.1f}%  "
-                f"K={result['n_stocks']}  "
+                f"{apply_date.date()} | "
+                f"ret={result['portfolio_ret']*100:+.2f}% "
+                f"excess={result['excess_ret']*100:+.2f}% "
+                f"turnover={result['turnover']*100:.1f}% "
+                f"K={result['n_stocks']} "
                 f"({elapsed:.1f}s)",
                 file=sys.stderr,
             )

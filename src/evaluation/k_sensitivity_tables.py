@@ -1,21 +1,3 @@
-"""
-K-sensitivity comparison table (RQ3): performance and portfolio
-characteristics across fixed K values [10, 15, 20, 25, 30].
-
-Columns: K | Sharpe (net) | Ann Return | Ann Vol | Max Drawdown |
-         Avg Turnover | Avg Cost | Avg HHI | Avg K (actual)
-
-Avg K (actual) = mean n_stocks per period. Should equal k since K is
-fixed, but deviations flag constraint violations.
-
-Outputs:
-  results/k_sensitivity/table_k_sensitivity.csv
-  results/k_sensitivity/table_k_sensitivity.tex
-  results/k_sensitivity/table_k_sensitivity.png
-
-python3 -m src.evaluation.k_sensitivity_tables
-"""
-
 import os
 
 import numpy as np
@@ -44,20 +26,19 @@ COLUMNS = [
 ]
 
 COL_LATEX = {
-    COL_K:        "$K$",
-    COL_SHARPE:   "Sharpe",
-    COL_RETURN:   "Ann.~Ret.",
-    COL_VOL:      "Ann.~Vol.",
-    COL_MDD:      "Max DD",
+    COL_K: "$K$",
+    COL_SHARPE: "Sharpe",
+    COL_RETURN: "Ann.~Ret.",
+    COL_VOL: "Ann.~Vol.",
+    COL_MDD: "Max DD",
     COL_TURNOVER: "Turnover",
-    COL_COST:     "Avg Cost",
-    COL_HHI:      "HHI",
+    COL_COST: "Avg Cost",
+    COL_HHI: "HHI",
     COL_K_ACTUAL: "$\\bar{K}_{\\text{actual}}$",
 }
 
 
 def load_k_results(k_values: list = K_VALUES) -> dict:
-    """Load parquets for all K values. Raises FileNotFoundError if missing."""
     data = {}
     for k in k_values:
         path = os.path.join(OUTPUT_DIR, f"k{k:02d}_results.parquet")
@@ -73,7 +54,6 @@ def load_k_results(k_values: list = K_VALUES) -> dict:
 
 
 def compute_metrics(df: pd.DataFrame, k: int) -> dict:
-    """Compute all table metrics for a single K run."""
     net = df["net_excess_ret"].values
     rf = df["rf"].values
     to = df["turnover"].values
@@ -87,20 +67,19 @@ def compute_metrics(df: pd.DataFrame, k: int) -> dict:
     mdd = float(np.min((cum - peak) / peak))
 
     return {
-        COL_K:        k,
-        COL_SHARPE:   sharpe,
-        COL_RETURN:   ann_ret,
-        COL_VOL:      ann_vol,
-        COL_MDD:      mdd,
+        COL_K: k,
+        COL_SHARPE: sharpe,
+        COL_RETURN: ann_ret,
+        COL_VOL: ann_vol,
+        COL_MDD: mdd,
         COL_TURNOVER: float(to.mean()),
-        COL_COST:     float(df["cost"].mean()),
-        COL_HHI:      float(df["hhi"].mean()),
+        COL_COST: float(df["cost"].mean()),
+        COL_HHI: float(df["hhi"].mean()),
         COL_K_ACTUAL: float(df["n_stocks"].mean()),
     }
 
 
 def build_table(data: dict) -> pd.DataFrame:
-    """Build the raw (numeric) table across all K values."""
     rows = [compute_metrics(data[k], k) for k in sorted(data.keys())]
     return pd.DataFrame(rows).set_index(COL_K)
 
@@ -126,11 +105,11 @@ def to_latex(fmt: pd.DataFrame) -> str:
         caption=(
             "K-sensitivity analysis: GA performance and portfolio characteristics "
             "with fixed cardinality $K \\in \\{10, 15, 20, 25, 30\\}$ "
-            "(January 2005--December 2025). "
+            "(January 2005 to December 2025). "
             "Fixed hyperparameters (pc=0.6054, pm=0.1370, $\\sigma_m$=0.1469, "
             "$\\lambda$=1.8437) are used throughout to isolate the effect of $K$. "
             "$\\bar{K}_{\\text{actual}}$ is the mean number of stocks held per "
-            "period and should equal $K$; deviations flag constraint violations."
+            "period and should equal $K$. Deviations flag constraint violations."
         ),
         label="tab:k_sensitivity",
         column_format="r" + "r" * fmt_latex.shape[1],

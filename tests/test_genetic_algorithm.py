@@ -13,24 +13,29 @@ from src.optimization.genetic_algorithm import (
 )
 from src.evaluation.metrics import portfolio_turnover
 
+
 def make_feasible_portfolio(rng, n=50):
     w = np.zeros(n)
     selected = rng.choice(n, size=K_MIN, replace=False)
     w[selected] = 1.0 / K_MIN
     return repair(w, rng)
 
+
 def two_feasible(rng, n=100):
     pop = initialize_population(n, rng)
     return pop[0], pop[1]
+
 
 def make_mu_sigma(n=5, monthly_ret=0.01, monthly_std=0.04):
     mu = np.full(n, monthly_ret)
     sigma = np.diag(np.full(n, monthly_std ** 2))
     return mu, sigma
 
+
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)
+
 
 class TestProjectBoundedSimplex:
 
@@ -63,11 +68,11 @@ class TestProjectBoundedSimplex:
     def test_infeasible_bounds_raises(self):
         v = np.full(5, 0.2)
 
-        # case (a): n * lower > 1  (5 * 0.3 = 1.5 > 1)
+        # case (a): n * lower > 1 (5 * 0.3 = 1.5 > 1)
         with pytest.raises(ValueError):
             project_bounded_simplex(v, lower=0.3, upper=0.5)
 
-        # case (b): n * upper < 1  (5 * 0.1 = 0.5 < 1)
+        # case (b): n * upper < 1 (5 * 0.1 = 0.5 < 1)
         with pytest.raises(ValueError):
             project_bounded_simplex(v, lower=0.01, upper=0.1)
 
@@ -78,6 +83,7 @@ class TestProjectBoundedSimplex:
         assert abs(w.sum() - 1.0) < 1e-10
         assert np.all(w >= W_MIN - 1e-10)
         assert np.all(w <= W_MAX + 1e-10)
+
 
 class TestRepair:
 
@@ -112,8 +118,8 @@ class TestRepair:
     def test_all_constraints_simultaneously_satisfied(self, rng):
         N = 200
         w = np.zeros(N)
-        w[:50] = 0.001   # too many stocks, weights below W_MIN
-        w[0]   = 0.9     # weight above W_MAX
+        w[:50] = 0.001  # too many stocks, weights below W_MIN
+        w[0] = 0.9  # weight above W_MAX
         result = repair(w, rng)
         self._assert_feasible(result)
 
@@ -181,6 +187,7 @@ class TestRepair:
             assert not np.any(np.isnan(result)), \
                 "repair produced NaN output"
 
+
 class TestInitializePopulation:
 
     def _all_feasible(self, pop):
@@ -226,6 +233,7 @@ class TestInitializePopulation:
         assert cardinalities.max() <= K_MAX
         assert len(np.unique(cardinalities)) >= 3, \
             f"Only {len(np.unique(cardinalities))} distinct cardinalities"
+
 
 class TestFitness:
 
@@ -280,13 +288,14 @@ class TestFitness:
         mu, sigma = make_mu_sigma()
         w = np.full(5, 0.2)
         assert fitness(w, mu * 2, sigma, lambda_=0.0) > \
-               fitness(w, mu,     sigma, lambda_=0.0)
+               fitness(w, mu, sigma, lambda_=0.0)
 
     def test_higher_risk_reduces_fitness_same_return(self):
         mu, sigma = make_mu_sigma()
         w = np.full(5, 0.2)
         assert fitness(w, mu, sigma * 4, lambda_=0.0) < \
-               fitness(w, mu, sigma,     lambda_=0.0)
+               fitness(w, mu, sigma, lambda_=0.0)
+
 
 class TestTournamentSelect:
 
@@ -348,6 +357,7 @@ class TestTournamentSelect:
             fitnesses = rng.random(POP_SIZE)
             winner = tournament_select(pop, fitnesses, rng)
             assert winner.shape == (N,)
+
 
 class TestCrossover:
 
@@ -425,6 +435,7 @@ class TestCrossover:
         for label, c in [("p1p2-c1", c1a), ("p1p2-c2", c2a),
                           ("p2p1-c1", c1b), ("p2p1-c2", c2b)]:
             self._assert_feasible(c, label)
+
 
 class TestMutate:
 
@@ -510,12 +521,14 @@ class TestMutate:
 
 from src.optimization.genetic_algorithm import local_refine, run_ga
 
+
 def make_estimation_data(n=50, t=60, seed=0):
     rng = np.random.default_rng(seed)
     ret_matrix = rng.normal(0.008, 0.05, size=(t, n))
     mu = ret_matrix.mean(axis=0)
     sigma = np.cov(ret_matrix, rowvar=False)
     return mu, sigma
+
 
 class TestLocalRefine:
 
@@ -550,7 +563,7 @@ class TestLocalRefine:
         f_in = fitness(p1, mu, sigma, None, LAMBDA)
         _, f_out = local_refine(p1, mu, sigma, None, rng)
         assert f_out >= f_in - 1e-12, \
-            f"local_refine decreased fitness: {f_in:.6f} -> {f_out:.6f}"
+            f"local_refine decreased fitness: {f_in:.6f} to {f_out:.6f}"
 
     def test_returned_fitness_matches_weight(self, rng):
         mu, sigma = make_estimation_data(n=self.N)
@@ -567,7 +580,7 @@ class TestLocalRefine:
         w_out, _ = local_refine(p1, mu, sigma, None, rng)
         k_out = (w_out > 0).sum()
         assert k_in == k_out, \
-            f"local_refine changed cardinality: {k_in} -> {k_out}"
+            f"local_refine changed cardinality: {k_in} to {k_out}"
 
     def test_unchanged_input(self, rng):
         mu, sigma = make_estimation_data(n=self.N)
@@ -582,6 +595,7 @@ class TestLocalRefine:
         w_out, f_out = local_refine(p1, mu, sigma, p2, rng)
         self._assert_feasible(w_out, "with prev_weights")
         assert isinstance(f_out, float)
+
 
 class TestRunGA:
 

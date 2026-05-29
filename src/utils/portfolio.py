@@ -7,13 +7,7 @@ ESTIMATION_WINDOW = 60
 
 
 def get_monthly_returns(returns: pd.DataFrame, permnos: list, month: pd.Timestamp) -> pd.Series:
-    """Return application-month returns aligned to the optimized universe.
-
-    Missing application-month returns are filled with 0.0 so the realised
-    return vector stays aligned with the optimized weight vector. This is a
-    practical treatment for rare missing observations and is discussed as a
-    backtest limitation in the thesis.
-    """
+    # Missing application-month returns are filled with 0.0, a backtest assumption.
     mask = (
         (returns["date"] == month) &
         (returns["permno"].isin(permnos))
@@ -36,12 +30,8 @@ def compute_drift_weights(weights: np.ndarray, stock_returns: np.ndarray) -> np.
     return drifted / total
 
 
-
-
 def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_permnos: list) -> np.ndarray:
-    """Align drifted weights to the current universe (new/departed stocks -> 0).
-    Falls back to equal weight if all holdings have left the universe.
-    """
+    # New or departed stocks get zero weight.
     aligned = (pd.Series(prev_weights, index=prev_permnos)
                .reindex(curr_permnos, fill_value=0.0)
                .values)
@@ -49,16 +39,13 @@ def align_drifted_weights(prev_weights: np.ndarray, prev_permnos: list, curr_per
     if total > 0:
         aligned = aligned / total
     else:
-        # all previous stocks left universe, treat as full replacement
+        # All previous stocks left the universe.
         aligned = np.ones(len(curr_permnos)) / len(curr_permnos)
     return aligned
 
 
 def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: pd.Timestamp) -> tuple:
-    """Build mu and sigma from the 60-month window [t-60, t-1].
-    Drops stocks with any missing month. Sigma is estimated with Ledoit-Wolf
-    shrinkage, which is more stable than sample covariance at high N/T ratios.
-    """
+    # Uses [t-60, t-1] and drops stocks with incomplete history.
     window_end = rebalance_date - pd.DateOffset(days=1)
     window_start = rebalance_date - pd.DateOffset(months=ESTIMATION_WINDOW)
 
@@ -88,7 +75,7 @@ def get_estimation_window(returns: pd.DataFrame, permnos: list, rebalance_date: 
 
 def print_results(results: pd.DataFrame, label: str, gamma: float = TRANSACTION_COST,
                   show_theoretical_hhi: bool = False) -> None:
-    """show_theoretical_hhi: print the 1/K lower bound, only meaningful for equal-weight."""
+    # show_theoretical_hhi prints the 1/K lower bound for equal-weight.
     clean = results.dropna(subset=["excess_ret", "rf", "turnover"])
     excess = clean["excess_ret"].values
     rf = clean["rf"].values

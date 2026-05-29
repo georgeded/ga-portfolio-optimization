@@ -1,11 +1,3 @@
-"""
-Mean-variance optimization - two variants:
-- Unconstrained MVO: maximize Sharpe, long-only [0, 1], no cardinality constraint.
-- Constrained MVO: maximize Sharpe, long-only, max weight 0.15, no cardinality constraint.
-
-Both use the 60-month estimation window, full universe (approx. 867 stocks), gamma = 0.3%.
-"""
-
 import numpy as np
 import pandas as pd
 import os
@@ -36,7 +28,6 @@ _solver_failures = 0
 
 
 def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
-    """Negative Sharpe objective for SLSQP."""
     port_return = float(weights @ mu)
     port_var = float(weights @ sigma @ weights)
     if port_var <= 0:
@@ -46,11 +37,6 @@ def negative_sharpe(weights: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> f
 
 def optimize_mvo(mu: np.ndarray, sigma: np.ndarray, w_min: float, w_max: float,
                  n_restarts: int = 3, rng: np.random.Generator = None) -> np.ndarray:
-    """Maximize Sharpe (SLSQP, n_restarts random starts). Falls back to equal weights on failure.
-
-    Three restarts reduce dependence on a single initial point while keeping the benchmark
-    feasible to run across all 252 monthly periods.
-    """
     if rng is None:
         rng = np.random.default_rng(seed=42)
 
@@ -94,7 +80,6 @@ def optimize_mvo(mu: np.ndarray, sigma: np.ndarray, w_min: float, w_max: float,
 
 def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma,
                            prev_weights, prev_permnos, rng) -> tuple:
-    """Process one rebalancing period. Returns (result_dict, new_weights, new_permnos)."""
     eligible = universe[universe["date"] == t]["permno"].tolist()
     if len(eligible) == 0:
         return None, prev_weights, prev_permnos
@@ -142,9 +127,6 @@ def _process_single_period(t, apply_date, universe, returns, w_min, w_max, gamma
 
 def run_mvo(universe: pd.DataFrame, returns: pd.DataFrame, constrained: bool = False,
             gamma: float = TRANSACTION_COST, seed: int = 42) -> pd.DataFrame:
-    """Run MVO over all rebalancing dates.
-    constrained=True uses bounds [0, 0.15]; False uses [0, 1.0].
-    """
     global _solver_failures
     rng = np.random.default_rng(seed)
     w_min = W_MIN_CONSTRAINED if constrained else W_MIN_UNCONSTRAINED

@@ -1,9 +1,3 @@
-"""
-Significance tests comparing GA vs benchmarks:
-  - Paired t-test: H0: mean return difference = 0
-  - Jobson-Korkie (Memmel correction): H0: Sharpe difference = 0
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,10 +20,6 @@ COL_JK_SIG = "JK Sig."
 
 
 def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
-    """
-    Var(SR1 - SR2) = (1/T)*[2*(1-rho) + 0.5*SR1^2 + 0.5*SR2^2 - SR1*SR2*(1+rho)]
-    var_diff can be negative for highly correlated strategies; guard -> z=0, p=1.
-    """
     T = len(r1)
     assert len(r2) == T, "Return series must have equal length"
 
@@ -73,7 +63,6 @@ def jobson_korkie_test(r1: np.ndarray, r2: np.ndarray) -> dict:
 
 
 def paired_ttest(r1: np.ndarray, r2: np.ndarray) -> dict:
-    """Paired t-test on monthly net excess return differences."""
     diff = r1 - r2
     t_stat, p_value = stats.ttest_1samp(diff, popmean=0)
     return {
@@ -90,7 +79,6 @@ def build_table2(
     mvo_unc_path: str = "results/benchmarks/mvo_unconstrained.parquet",
     mvo_con_path: str = "results/benchmarks/mvo_constrained.parquet",
 ) -> tuple:
-    """Run all significance tests. Returns (raw_df, fmt_df)."""
     ga = pd.read_parquet(ga_path)
     ew = pd.read_parquet(ew_path)
     mvo_unc = pd.read_parquet(mvo_unc_path)
@@ -118,9 +106,9 @@ def build_table2(
     r_mvo_con = mvo_con["net_excess_ret"].values
 
     benchmarks = {
-        "GA vs 1/N":               r_ew,
+        "GA vs 1/N": r_ew,
         "GA vs Unconstrained MVO": r_mvo_unc,
-        "GA vs Constrained MVO":   r_mvo_con,
+        "GA vs Constrained MVO": r_mvo_con,
     }
 
     rows = []
@@ -129,16 +117,16 @@ def build_table2(
         jk = jobson_korkie_test(r_ga, r_bench)
         rows.append({
             COL_COMPARISON: label,
-            COL_MEAN_DIFF:  tt["mean_diff_ann"],
-            COL_T_STAT:     tt["t_stat"],
-            COL_T_PVAL:     tt["p_value"],
-            COL_T_SIG:      tt["significant"],
-            COL_SR_GA:      jk["sr1_ann"],
-            COL_SR_BENCH:   jk["sr2_ann"],
-            COL_SR_DIFF:    jk["sr_diff_ann"],
-            COL_Z_STAT:     jk["z_stat"],
-            COL_JK_PVAL:    jk["p_value"],
-            COL_JK_SIG:     jk["significant"],
+            COL_MEAN_DIFF: tt["mean_diff_ann"],
+            COL_T_STAT: tt["t_stat"],
+            COL_T_PVAL: tt["p_value"],
+            COL_T_SIG: tt["significant"],
+            COL_SR_GA: jk["sr1_ann"],
+            COL_SR_BENCH: jk["sr2_ann"],
+            COL_SR_DIFF: jk["sr_diff_ann"],
+            COL_Z_STAT: jk["z_stat"],
+            COL_JK_PVAL: jk["p_value"],
+            COL_JK_SIG: jk["significant"],
         })
 
     raw = pd.DataFrame(rows).set_index(COL_COMPARISON)
@@ -215,9 +203,9 @@ def to_latex(fmt: pd.DataFrame) -> str:
     return display.to_latex(
         caption=(
             "Statistical significance of GA performance differences "
-            "vs benchmarks (January 2005--December 2025, $T=252$). "
+            "vs benchmarks (January 2005 to December 2025, $T=252$). "
             "Paired $t$-test: $H_0$: mean return difference $= 0$. "
-            "Jobson--Korkie (Memmel 2003): $H_0$: Sharpe difference $= 0$. "
+            "Jobson-Korkie (Memmel 2003): $H_0$: Sharpe difference $= 0$. "
             "$\\alpha = 0.05$ (two-tailed). "
             "JK assumes i.i.d.\\ normal returns."
         ),

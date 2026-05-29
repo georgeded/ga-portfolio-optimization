@@ -1,7 +1,4 @@
-"""
-Generates F1-F5: cumulative returns, rolling Sharpe, turnover, HHI, and GA cardinality.
-Greyscale-compatible (readable in B&W print). Legends below figure to avoid obscuring data.
-"""
+# Figures use grayscale-friendly styles for print.
 
 import numpy as np
 import pandas as pd
@@ -28,15 +25,15 @@ plt.rcParams.update({
 })
 
 STYLES = {
-    "GA":                {"color": "#000000", "lw": 2.0, "ls": "-"},
+    "GA": {"color": "#000000", "lw": 2.0, "ls": "-"},
     "Unconstrained MVO": {"color": "#444444", "lw": 1.5, "ls": "--"},
-    "Constrained MVO":   {"color": "#888888", "lw": 1.5, "ls": "-."},
-    "1/N":               {"color": "#bbbbbb", "lw": 1.5, "ls": ":"},
+    "Constrained MVO": {"color": "#888888", "lw": 1.5, "ls": "-."},
+    "1/N": {"color": "#bbbbbb", "lw": 1.5, "ls": ":"},
 }
 
 OUT_DIR = "results/figures"
 
-# crisis periods applied consistently across all time-series figures
+# Crisis periods used in all time-series figures.
 CRISES = [
     {"start": "2008-09-01", "end": "2009-06-01",
      "color": "black", "label": "GFC (2008-09)"},
@@ -53,6 +50,7 @@ def make_strategy_handles() -> list:
         ))
     return handles
 
+
 def make_crisis_handles() -> list:
     return [
         mpatches.Patch(color=c["color"], alpha=0.25, label=c["label"])
@@ -67,10 +65,10 @@ def load_all(
     mvo_con_path: str = "results/benchmarks/mvo_constrained.parquet",
 ) -> dict:
     data = {
-        "GA":                pd.read_parquet(ga_path),
+        "GA": pd.read_parquet(ga_path),
         "Unconstrained MVO": pd.read_parquet(mvo_unc_path),
-        "Constrained MVO":   pd.read_parquet(mvo_con_path),
-        "1/N":               pd.read_parquet(ew_path),
+        "Constrained MVO": pd.read_parquet(mvo_con_path),
+        "1/N": pd.read_parquet(ew_path),
     }
     for name, df in data.items():
         df["date"] = pd.to_datetime(df["date"])
@@ -112,7 +110,6 @@ def smooth_series(series: pd.Series, window: int = 6) -> pd.Series:
 
 
 def add_crisis_shading(ax) -> None:
-    """Add shaded crisis periods. Legend handled by fig.legend."""
     for crisis in CRISES:
         ax.axvspan(
             pd.Timestamp(crisis["start"]),
@@ -122,7 +119,6 @@ def add_crisis_shading(ax) -> None:
 
 
 def add_bottom_legend(fig, extra_handles: list = None, ncol: int = 6) -> None:
-    """Shared legend below the figure: strategy lines + crisis patches."""
     handles = make_strategy_handles() + make_crisis_handles()
     if extra_handles:
         handles += extra_handles

@@ -1,6 +1,6 @@
 # GA Portfolio Optimization
 
-BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-constrained US equity portfolios and is evaluated out-of-sample against MVO and equal-weight benchmarks from January 2005 to December 2025 (252 monthly periods) on a universe of ~870 stocks. The GA underperforms all three benchmarks, with a Sharpe of 0.274 vs 0.581 for MVO.
+BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-constrained US equity portfolios and is evaluated out-of-sample against MVO and equal-weight benchmarks from January 2005 to December 2025 (252 monthly periods) on a universe of around 870 stocks. The GA underperforms all three benchmarks, with a Sharpe of 0.274 vs 0.581 for MVO.
 
 ## Results
 
@@ -9,18 +9,24 @@ BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-c
 | **GA (adaptive K)** | **0.2741** | **5.5%** | **19.9%** | **-55.8%** | **22.2%** |
 | Constrained MVO | 0.5810 | 8.3% | 14.3% | -43.1% | 17.1% |
 | Unconstrained MVO | 0.5809 | 8.3% | 14.3% | -43.1% | 17.1% |
-| 1/N (~867 stocks) | 0.5307 | 9.1% | 17.2% | -51.3% | 4.5% |
+| 1/N (867 stocks) | 0.5307 | 9.1% | 17.2% | -51.3% | 4.5% |
 
 Evaluation: January 2005 to December 2025, 252 monthly out-of-sample periods. All metrics are on net excess returns after transaction costs. Annualized return = mean monthly * 12, annualized vol = monthly std * sqrt(12), Sharpe = annualized return / annualized vol. Constrained MVO caps individual weights at 0.15.
 
-The GA underperforms all three benchmarks. The Jobson-Korkie test shows the GA vs MVO Sharpe gap is statistically significant (p = 0.004). The GA vs 1/N gap is not significant (p = 0.132). Constrained and unconstrained MVO produce nearly identical results (Sharpe 0.5810 vs 0.5809); with ~62 stocks held on average, the implied average weight (~1.6%) is well below the 15% cap. The underperformance is more likely driven by in-sample fitness noise: with N/T ≈ 14.5, the in-sample Sharpe is a poor proxy for out-of-sample returns even with Ledoit-Wolf regularisation.
+The GA underperforms all three benchmarks. The Jobson-Korkie test shows the GA vs MVO Sharpe gap is statistically significant (p = 0.004). The GA vs 1/N gap is not significant (p = 0.132). Constrained and unconstrained MVO produce nearly identical results (Sharpe 0.5810 vs 0.5809); with around 62 stocks held on average, the implied average weight (1.6%) is well below the 15% cap. The underperformance is more likely driven by in-sample fitness noise: with N/T ≈ 14.5, the in-sample Sharpe is a poor proxy for out-of-sample returns even with Ledoit-Wolf regularisation.
 
 Fixed-K experiments show K=25/30 outperform the adaptive version; see thesis for details. A lambda ablation confirms the turnover penalty reduces trading costs at the expense of Sharpe; see thesis.
+
+![Cumulative net portfolio value](results/figures/F1_cumulative_returns.png)
+*Cumulative net portfolio value, 2005–2025.*
+
+![Rolling 12-month Sharpe ratio](results/figures/F2_rolling_sharpe.png)
+*Rolling 12-month Sharpe ratio. GA underperforms MVO across most of the evaluation period.*
 
 ## Methodology
 
 - **Data:** CRSP monthly stock file (CIZ format), Jan 2000–Dec 2025 (WRDS). Risk-free rate: FRED DTB3 (3-month T-bill, annual % converted to monthly decimal).
-- **Universe:** NYSE/NASDAQ common stocks, market cap ≥ $2B (lagged 1 month). ~870 eligible stocks per month; 60-month burn-in; first rebalancing January 2005. Covariance estimated with Ledoit-Wolf shrinkage (sklearn).
+- **Universe:** NYSE/NASDAQ common stocks, market cap ≥ $2B (lagged 1 month). Around 870 eligible stocks per month; 60-month burn-in; first rebalancing January 2005. Covariance estimated with Ledoit-Wolf shrinkage (sklearn).
 - **GA:** Real-valued weight vector, K ∈ [10, 30] non-zero entries each in [0.02, 0.15] summing to 1. Fitness = monthly Sharpe − λ × Turnover (λ = 1.8437). Tournament selection, union-based crossover with arithmetic blend, Gaussian mutation, bisection repair onto bounded simplex. 8 independent runs per period; 100 population, 200 max generations, 20-generation early stop.
 - **MVO:** Long-only Sharpe maximisation via SLSQP (3 random restarts); constrained variant caps individual weights at 0.15. Same estimation window, universe, and cost model as the GA.
 - **Evaluation:** 252 monthly OOS periods, rolling 60-month window. Transaction cost γ = 0.3% per unit of turnover, deducted from all strategies. Significance: paired t-test and Jobson-Korkie test (Memmel 2003 correction).

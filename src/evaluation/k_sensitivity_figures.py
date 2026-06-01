@@ -138,13 +138,6 @@ def plot_fk1(data: dict) -> None:
         ax.set_xticks(k_list)
         ax.set_xlabel("Fixed Cardinality K")
         ax.set_ylabel(ylabel)
-        ax.set_title(title)
-
-    fig.suptitle(
-        "Figure K1: Effect of Fixed Cardinality K on Performance Metrics",
-        fontsize=13,
-        y=1.02,
-    )
 
     caption_text = (
         "Effect of fixed cardinality K on net Sharpe ratio, average monthly "
@@ -177,7 +170,6 @@ def plot_fk2(data: dict) -> None:
             label=f"K={k}",
         )
 
-    ax.set_title("Figure K2: Cumulative Net Portfolio Value by Fixed K (2005-2025)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Portfolio Value (net of costs, initial = 1.0)")
 

@@ -159,7 +159,6 @@ def plot_cumulative_returns(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 1: Cumulative Net Portfolio Value (2005-2025)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Portfolio Value (net of costs, initial = 1.0)")
 
@@ -189,7 +188,6 @@ def plot_rolling_sharpe(data: dict, window: int = 12) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title(f"Figure 2: Rolling {window}-Month Sharpe Ratio (net, annualized)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Sharpe Ratio")
 
@@ -219,15 +217,14 @@ def plot_turnover(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 3: Monthly Portfolio Turnover (6-month rolling avg)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Turnover (%)")
 
     add_bottom_legend(fig, ncol=6)
     add_caption(fig,
+        "Monthly portfolio turnover (6-month rolling average). "
         "Turnover = 0.5 * sum(|w_t - w_{t-1}|) where w_{t-1} reflects post-drift weights "
-        "before rebalancing. Smoothed with a 6-month rolling average for readability. "
-        "First-period turnover (100%) excluded after smoothing."
+        "before rebalancing. First-period turnover (100%) excluded after smoothing."
     )
 
     fig.tight_layout(rect=[0, 0.08, 1, 1])
@@ -249,7 +246,6 @@ def plot_hhi(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 4: Portfolio Concentration, HHI (6-month rolling avg)")
     ax.set_xlabel("Date")
     ax.set_ylabel("Herfindahl-Hirschman Index")
 
@@ -286,7 +282,6 @@ def plot_cardinality(data: dict) -> None:
     add_crisis_shading(ax)
     fmt_axes(ax)
 
-    ax.set_title("Figure 5: GA Selected Portfolio Size (K) Over Time")
     ax.set_xlabel("Date")
     ax.set_ylabel("Number of Stocks Selected (K)")
 

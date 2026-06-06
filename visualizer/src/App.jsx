@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { FaChartLine, FaDice, FaDna, FaMoon, FaRandom, FaSun, FaSyncAlt, FaTrophy, FaWrench } from 'react-icons/fa'
+import { FaChartLine, FaDice, FaDna, FaMoon, FaRandom, FaSun, FaSyncAlt, FaTable, FaTrophy, FaWrench } from 'react-icons/fa'
 
 const FITNESS_TEX = String.raw`f(\mathbf{w}) = \operatorname{Sharpe}(\mathbf{w}) - \lambda\,\operatorname{Turnover}(\mathbf{w}, \mathbf{w}_{prev})`
 const TURNOVER_TEX = String.raw`\operatorname{Turnover}(\mathbf{w}, \mathbf{w}_{prev}) = \frac{1}{2}\sum_i |w_i - w_{prev,i}|`
@@ -109,18 +109,18 @@ function Card({ children, hl, style = {} }) {
   const borderColor = hl === 'blue' ? 'var(--accent)' : hl === 'green' ? 'var(--green)' : hl === 'amber' ? 'var(--amber)' : 'var(--border)'
   const bgColor = hl ? `color-mix(in srgb, ${borderColor} 6%, var(--card))` : 'var(--card)'
   return (
-    <div style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 10, padding: '14px 16px', ...style }}>
+    <div className="content-card" style={{ background: bgColor, border: `1px solid ${borderColor}`, borderRadius: 10, padding: '14px 16px', ...style }}>
       {children}
     </div>
   )
 }
 
 function SecLabel({ children }) {
-  return <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--text3)', marginBottom: 10 }}>{children}</div>
+  return <div className="section-label" style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: 'var(--text3)', marginBottom: 10 }}>{children}</div>
 }
 
 function ParamTag({ children }) {
-  return <span style={{ display: 'inline-flex', maxWidth: '100%', overflowX: 'auto', fontSize: 13, fontFamily: 'var(--mono)', background: 'var(--tag-bg)', color: 'var(--tag-text)', borderRadius: 5, padding: '4px 10px' }}>{children}</span>
+  return <span className="param-tag" style={{ display: 'inline-flex', maxWidth: '100%', overflowX: 'auto', fontSize: 13, fontFamily: 'var(--mono)', background: 'var(--tag-bg)', color: 'var(--tag-text)', borderRadius: 5, padding: '4px 10px' }}>{children}</span>
 }
 
 function Tag({ children, color = 'blue' }) {
@@ -148,7 +148,7 @@ function Bullets({ items }) {
 }
 
 function ParamRow({ children }) {
-  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>{children}</div>
+  return <div className="param-row" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>{children}</div>
 }
 
 function StepPopulation() {
@@ -156,7 +156,10 @@ function StepPopulation() {
     <div>
       <Card style={{ marginBottom: 12 }}>
         <Bullets items={[
-          { content: <>A <strong>chromosome</strong> encodes weights for <Formula tex={"K"} /> stocks out of <Formula tex={"\\approx 867"} /></> },
+          { content: <>
+            <span className="population-bullet-desktop">A <strong>chromosome</strong> encodes weights for <Formula tex={"K"} /> stocks out of <Formula tex={"\\approx 867"} /></span>
+            <span className="population-bullet-mobile">A <strong>chromosome</strong> encodes weights for <Formula tex={"K"} /> active stocks<br />out of <Formula tex={"\\approx 867"} /> available stocks.</span>
+          </> },
           { content: <><Formula tex={"K \\in [10, 30]"} /> active stocks, weights <Formula tex={"\\in [0.02, 0.15]"} />, all summing to <Formula tex={"1"} /></> },
         ]} />
       </Card>
@@ -208,12 +211,12 @@ function StepFitness() {
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>Sharpe</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--mono)' }}>1.28</div>
           </div>
-          <div style={{ fontSize: 22, color: 'var(--text3)', fontFamily: 'var(--mono)' }}><Formula tex={"-"} /></div>
+          <div className="fitness-operator" style={{ fontSize: 22, color: 'var(--text3)', fontFamily: 'var(--mono)' }}><Formula tex={"-"} /></div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}><Formula tex={"1.8437 \\times 0.088"} /></div>
             <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--red)', fontFamily: 'var(--mono)' }}>0.162</div>
           </div>
-          <div style={{ fontSize: 22, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>=</div>
+          <div className="fitness-operator" style={{ fontSize: 22, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>=</div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 4 }}>Fitness <Formula tex={"f(\\mathbf{w})"} /></div>
             <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--mono)' }}>1.12</div>
@@ -325,9 +328,9 @@ function StepMutation() {
       </div>
       <div className="portfolio-flow mobile-stack" style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ flex: 1 }}><PortCard p={before} label="Before mutation" barHeight={58} /></div>
-        <div style={{ textAlign: 'center', flexShrink: 0 }}>
-          <div style={{ fontSize: 30, color: 'var(--text3)' }}><Formula tex={"\\to"} /></div>
-          <div style={{ fontSize: 13, color: 'var(--text3)' }}><Formula tex={"+"} /> repair</div>
+        <div className="mutation-connector" style={{ textAlign: 'center', flexShrink: 0 }}>
+          <div className="mutation-arrow" style={{ fontSize: 30, color: 'var(--text3)' }}><Formula tex={"\\to"} /></div>
+          <div className="mutation-repair" style={{ fontSize: 13, color: 'var(--text3)' }}><Formula tex={"+"} /> repair</div>
         </div>
         <div style={{ flex: 1 }}><PortCard p={after} label="After mutation + repair" hl="amber" barHeight={58} /></div>
       </div>
@@ -348,7 +351,7 @@ function StepRepair() {
         <Bullets items={[
           { text: 'Applied after every genetic op: cardinality fix, then bisection projection' },
           { content: <>Bisection finds <Formula tex={"\\lambda^*"} /> so <Formula tex={"\\operatorname{clip}(\\mathbf{w} - \\lambda^*, W_{\\min}, W_{\\max})"} /> sums exactly to <Formula tex={"1"} /></> },
-          { content: <>If projection shifts cardinality, recurse once (max depth = <Formula tex={"1"} />)</> },
+          { content: <>If projection shifts cardinality, recurse once.<br /><span style={{ whiteSpace: 'nowrap' }}>Max depth = <Formula tex={"1"} />.</span></> },
         ]} />
       </Card>
       <div className="mobile-one-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -362,7 +365,13 @@ function StepRepair() {
         <Card>
           <SecLabel>Step 2: Project</SecLabel>
           <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.8 }}>
-            Bisection finds <Formula tex={"\\lambda^*"} /> such that <Formula tex={"\\operatorname{clip}(\\mathbf{w} - \\lambda^*, W_{\\min}, W_{\\max})"} /> sums to <Formula tex={"1"} />. Guaranteed feasible.
+            Bisection finds <Formula tex={"\\lambda^*"} /> such that
+          </p>
+          <div style={{ margin: '6px 0', overflowX: 'auto', textAlign: 'center', fontSize: 14, color: 'var(--text)' }}>
+            <Formula tex={"\\operatorname{clip}(\\mathbf{w} - \\lambda^*, W_{\\min}, W_{\\max})"} />
+          </div>
+          <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.8 }}>
+            sums to <Formula tex={"1"} />. Guaranteed feasible.
           </p>
         </Card>
         <Card>
@@ -386,9 +395,9 @@ function StepRepair() {
 
 function StepNewGen() {
   const runs = [
-    { seed: 0, f: 1.09 }, { seed: 1, f: 1.15 }, { seed: 2, f: 1.07 },
-    { seed: 3, f: 1.12 }, { seed: 4, f: 1.06 }, { seed: 5, f: 1.14 },
-    { seed: 6, f: 1.08 }, { seed: 7, f: 1.10 },
+    { seed: 1000, f: 1.09 }, { seed: 1001, f: 1.15 }, { seed: 1002, f: 1.07 },
+    { seed: 1003, f: 1.12 }, { seed: 1004, f: 1.06 }, { seed: 1005, f: 1.14 },
+    { seed: 1006, f: 1.08 }, { seed: 1007, f: 1.10 },
   ]
   const sorted = [...runs].sort((a, b) => a.f - b.f)
   const median = (sorted[3].f + sorted[4].f) / 2
@@ -413,7 +422,7 @@ function StepNewGen() {
           <SecLabel>Local Refinement</SecLabel>
           <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.8, marginBottom: 8 }}>
             Applied to the <strong>single best elite</strong> after each generation.
-            Makes 5 greedy weight-shift attempts of <Formula tex={"\\delta = 0.01"} />; keeps a shift only if fitness improves.
+            Makes 5 greedy weight-shift attempts of <Formula tex={"\\delta = 0.01"} />, keeps a shift only if fitness improves.
           </p>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--amber)' }}>
             <Formula tex={"f\\colon 1.12 \\to 1.16"} /> after 5 shifts
@@ -422,7 +431,7 @@ function StepNewGen() {
       </div>
 
       <Card>
-        <SecLabel>8 Parallel Runs (seeds 1000-1007) - canonical = closest to median</SecLabel>
+        <SecLabel>8 parallel runs (seeds 1000–1007) · canonical = closest to median</SecLabel>
         {runs.map(r => {
           const isC = r.seed === canonical.seed
           const pct = ((r.f - minF) / (maxF - minF + 0.01)) * 70 + 20
@@ -451,6 +460,56 @@ function StepNewGen() {
   )
 }
 
+function Accordion({ label, children }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button type="button" className="accordion-btn" onClick={() => setOpen(o => !o)}>
+        <span>{label}</span>
+        <span className="accordion-chevron">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && <div className="accordion-body">{children}</div>}
+    </div>
+  )
+}
+
+function StepResults() {
+  return (
+    <div>
+      <Card style={{ marginBottom: 12 }}>
+        <SecLabel>Performance — 252 OOS periods, Jan 2005–Dec 2025</SecLabel>
+        <img src="/T1_performance.png" className="results-img" alt="Performance evaluation table" />
+      </Card>
+      <Card style={{ marginBottom: 12 }}>
+        <SecLabel>Cumulative net portfolio value</SecLabel>
+        <img src="/F1_cumulative_returns.png" className="results-img" alt="Cumulative net portfolio value, 2005–2025" />
+      </Card>
+      <Accordion label="Additional figures">
+        <Card>
+          <SecLabel>Rolling 12-month Sharpe ratio</SecLabel>
+          <img src="/F2_rolling_sharpe.png" className="results-img" alt="Rolling 12-month Sharpe ratio" />
+        </Card>
+        <Card>
+          <SecLabel>Adaptive cardinality K over time</SecLabel>
+          <img src="/F5_cardinality.png" className="results-img" alt="Adaptive cardinality K over time" />
+        </Card>
+        <Card>
+          <SecLabel>Monthly portfolio turnover</SecLabel>
+          <img src="/F3_turnover.png" className="results-img" alt="Monthly portfolio turnover" />
+        </Card>
+        <Card>
+          <SecLabel>Turnover penalty ablation (λ = 0 vs λ = 1.8437)</SecLabel>
+          <img src="/T5_lambda_ablation.png" className="results-img" alt="Lambda ablation table" />
+        </Card>
+      </Accordion>
+      <p style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.7, marginTop: 10 }}>
+        JK test: GA vs MVO <em>p</em> = 0.004 (significant); GA vs 1/N <em>p</em> = 0.132 (not significant).
+        λ-ablation: removing the penalty raises net Sharpe from 0.274 to 0.499.
+      </p>
+    </div>
+  )
+}
+
 const STEPS = [
   { icon: FaDna, iconColor: '#8b5cf6', title: 'Population', sub: <>100 feasible portfolios, <Formula tex={"K \\in [10, 30]"} /> active stocks</>, body: StepPopulation },
   { icon: FaChartLine, iconColor: '#059669', title: 'Fitness', sub: <><Formula tex={FITNESS_TEX} /> sparse-aware, <Formula tex={"\\lambda = 1.8437"} /></>, body: StepFitness },
@@ -459,6 +518,7 @@ const STEPS = [
   { icon: FaDice, iconColor: '#dc2626', title: 'Mutation', sub: <>Gaussian noise + asset swap, both <Formula tex={`p_m = ${P.PM}`} />, fire independently</>, body: StepMutation },
   { icon: FaWrench, iconColor: '#0891b2', title: 'Repair', sub: <>Bounded simplex projection enforces <Formula tex={"K"} />, <Formula tex={"[W_{\\min}, W_{\\max}]"} />, <Formula tex={"\\sum_i w_i = 1"} /> after every genetic operation.</>, body: StepRepair },
   { icon: FaSyncAlt, iconColor: '#7c3aed', title: 'New Gen', sub: 'Elitism preserves top 5. Local refinement polishes the best. 8 seeds, median selection.', body: StepNewGen },
+  { icon: FaTable, iconColor: '#059669', title: 'Results', sub: 'GA Sharpe 0.274 vs MVO 0.581 over 252 OOS periods. The turnover penalty is the main driver of underperformance.', body: StepResults },
 ]
 
 export default function App() {
@@ -474,14 +534,48 @@ export default function App() {
     window.localStorage.setItem('ga-theme', dark ? 'dark' : 'light')
   }, [dark])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const isEditing = target => {
+      if (!(target instanceof HTMLElement)) return false
+      return Boolean(target.closest('input, textarea, select, button, a, [contenteditable="true"], [contenteditable=""], [role="textbox"]'))
+    }
+
+    const onKeyDown = event => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || isEditing(event.target)) return
+
+      if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(event.key)) {
+        event.preventDefault()
+        setStep(s => Math.min(STEPS.length - 1, s + 1))
+        return
+      }
+
+      if (['ArrowLeft', 'PageUp', 'Backspace'].includes(event.key)) {
+        event.preventDefault()
+        setStep(s => Math.max(0, s - 1))
+        return
+      }
+
+      if (/^[1-8]$/.test(event.key)) {
+        event.preventDefault()
+        setStep(Number(event.key) - 1)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
   return (
     <div data-dark={dark} style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', transition: 'background .25s, color .25s' }}>
       <div className="app-container" style={{ maxWidth: 960, margin: '0 auto', padding: '20px 24px' }}>
 
         <div className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
-          <div>
+          <div className="app-heading">
             <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 0 }}>GA Portfolio Optimizer: Algorithm Walkthrough</h1>
             <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4 }}>BSc Thesis &middot; VU Amsterdam &middot; Cardinality-Constrained Portfolio Optimization</p>
+            <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>George Dedempilis &middot; 2803764</p>
           </div>
           <ThemeToggle dark={dark} onChange={setDark} />
         </div>
@@ -533,7 +627,7 @@ export default function App() {
           </button>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+        <div className="scale-note" style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
           Real scale: <Formula tex={"N \\approx 867"} /> stocks &middot; <Formula tex={"K \\in [10,30]"} /> &middot; <Formula tex={"\\text{pop} = 100"} /> &middot; <Formula tex={"200"} /> gens &middot; 8 parallel runs &middot; 252 OOS periods
         </div>
       </div>

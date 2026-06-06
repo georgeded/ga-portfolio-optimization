@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import { FaChartLine, FaDice, FaDna, FaMoon, FaRandom, FaSun, FaSyncAlt, FaTable, FaTrophy, FaWrench } from 'react-icons/fa'
+import { FaChartLine, FaDice, FaDna, FaMoon, FaRandom, FaSun, FaSyncAlt, FaTrophy, FaWrench } from 'react-icons/fa'
 
 const FITNESS_TEX = String.raw`f(\mathbf{w}) = \operatorname{Sharpe}(\mathbf{w}) - \lambda\,\operatorname{Turnover}(\mathbf{w}, \mathbf{w}_{prev})`
 const TURNOVER_TEX = String.raw`\operatorname{Turnover}(\mathbf{w}, \mathbf{w}_{prev}) = \frac{1}{2}\sum_i |w_i - w_{prev,i}|`
@@ -460,56 +460,6 @@ function StepNewGen() {
   )
 }
 
-function Accordion({ label, children }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div>
-      <button type="button" className="accordion-btn" onClick={() => setOpen(o => !o)}>
-        <span>{label}</span>
-        <span className="accordion-chevron">{open ? '▲' : '▼'}</span>
-      </button>
-      {open && <div className="accordion-body">{children}</div>}
-    </div>
-  )
-}
-
-function StepResults() {
-  return (
-    <div>
-      <Card style={{ marginBottom: 12 }}>
-        <SecLabel>Performance — 252 OOS periods, Jan 2005–Dec 2025</SecLabel>
-        <img src="/T1_performance.png" className="results-img" alt="Performance evaluation table" />
-      </Card>
-      <Card style={{ marginBottom: 12 }}>
-        <SecLabel>Cumulative net portfolio value</SecLabel>
-        <img src="/F1_cumulative_returns.png" className="results-img" alt="Cumulative net portfolio value, 2005–2025" />
-      </Card>
-      <Accordion label="Additional figures">
-        <Card>
-          <SecLabel>Rolling 12-month Sharpe ratio</SecLabel>
-          <img src="/F2_rolling_sharpe.png" className="results-img" alt="Rolling 12-month Sharpe ratio" />
-        </Card>
-        <Card>
-          <SecLabel>Adaptive cardinality K over time</SecLabel>
-          <img src="/F5_cardinality.png" className="results-img" alt="Adaptive cardinality K over time" />
-        </Card>
-        <Card>
-          <SecLabel>Monthly portfolio turnover</SecLabel>
-          <img src="/F3_turnover.png" className="results-img" alt="Monthly portfolio turnover" />
-        </Card>
-        <Card>
-          <SecLabel>Turnover penalty ablation (λ = 0 vs λ = 1.8437)</SecLabel>
-          <img src="/T5_lambda_ablation.png" className="results-img" alt="Lambda ablation table" />
-        </Card>
-      </Accordion>
-      <p style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.7, marginTop: 10 }}>
-        JK test: GA vs MVO <em>p</em> = 0.004 (significant); GA vs 1/N <em>p</em> = 0.132 (not significant).
-        λ-ablation: removing the penalty raises net Sharpe from 0.274 to 0.499.
-      </p>
-    </div>
-  )
-}
-
 const STEPS = [
   { icon: FaDna, iconColor: '#8b5cf6', title: 'Population', sub: <>100 feasible portfolios, <Formula tex={"K \\in [10, 30]"} /> active stocks</>, body: StepPopulation },
   { icon: FaChartLine, iconColor: '#059669', title: 'Fitness', sub: <><Formula tex={FITNESS_TEX} /> sparse-aware, <Formula tex={"\\lambda = 1.8437"} /></>, body: StepFitness },
@@ -518,7 +468,6 @@ const STEPS = [
   { icon: FaDice, iconColor: '#dc2626', title: 'Mutation', sub: <>Gaussian noise + asset swap, both <Formula tex={`p_m = ${P.PM}`} />, fire independently</>, body: StepMutation },
   { icon: FaWrench, iconColor: '#0891b2', title: 'Repair', sub: <>Bounded simplex projection enforces <Formula tex={"K"} />, <Formula tex={"[W_{\\min}, W_{\\max}]"} />, <Formula tex={"\\sum_i w_i = 1"} /> after every genetic operation.</>, body: StepRepair },
   { icon: FaSyncAlt, iconColor: '#7c3aed', title: 'New Gen', sub: 'Elitism preserves top 5. Local refinement polishes the best. 8 seeds, median selection.', body: StepNewGen },
-  { icon: FaTable, iconColor: '#059669', title: 'Results', sub: 'GA Sharpe 0.274 vs MVO 0.581 over 252 OOS periods. The turnover penalty is the main driver of underperformance.', body: StepResults },
 ]
 
 export default function App() {
@@ -557,7 +506,7 @@ export default function App() {
         return
       }
 
-      if (/^[1-8]$/.test(event.key)) {
+      if (/^[1-7]$/.test(event.key)) {
         event.preventDefault()
         setStep(Number(event.key) - 1)
       }

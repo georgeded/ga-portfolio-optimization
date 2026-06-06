@@ -271,50 +271,6 @@ body {
   --switch-text: #94a3b8;
 }
 
-.accordion-btn {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 16px;
-  margin-bottom: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card);
-  color: var(--text2);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  text-align: left;
-  transition: background .2s;
-}
-
-.accordion-btn:hover {
-  background: var(--tag-bg);
-}
-
-.accordion-chevron {
-  font-size: 10px;
-  color: var(--text3);
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-
-.accordion-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.results-img {
-  width: 100%;
-  display: block;
-  border-radius: 6px;
-}
-
 @media (max-width: 720px) {
   .app-container {
     padding: 14px 12px !important;

@@ -20,13 +20,43 @@ The GA underperforms all three benchmarks. The Jobson-Korkie test shows the GA v
 The primary cause of underperformance is the turnover penalty. A full 252-period ablation (λ = 0 vs λ = 1.8437) shows that removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly three-quarters of the gap against MVO. The remaining shortfall reflects estimation noise from a rank-deficient covariance matrix (N/T ≈ 14.5). The fixed-K sweep corroborates this: K = 25 and K = 30 reach Sharpe 0.44, while the adaptive mechanism settles near K = 16.3 on average, because the penalty makes smaller portfolios cheaper to hold.
 
 ![Cumulative net portfolio value](results/figures/F1_cumulative_returns.png)
-Cumulative net portfolio value, 2005-2025.
+*Cumulative net portfolio value, 2005–2025.*
+
+<details>
+<summary>Rolling 12-month Sharpe ratio</summary>
 
 ![Rolling 12-month Sharpe ratio](results/figures/F2_rolling_sharpe.png)
-Rolling 12-month Sharpe ratio. GA underperforms MVO across most of the evaluation period.
+
+GA underperforms MVO across most of the evaluation period.
+
+</details>
+
+<details>
+<summary>Adaptive cardinality K over time</summary>
 
 ![Adaptive cardinality K](results/figures/F5_cardinality.png)
-Adaptive cardinality K over time. The GA settles around K=16 on average, well below the upper bound of 30.
+
+The GA settles near K = 16 on average, well below the upper bound of 30.
+
+</details>
+
+<details>
+<summary>Significance tests</summary>
+
+![Statistical significance](results/tables/T2_significance.png)
+
+Jobson-Korkie test (Memmel 2003 correction). GA vs MVO p = 0.004; GA vs 1/N p = 0.132.
+
+</details>
+
+<details>
+<summary>Turnover penalty ablation</summary>
+
+![Lambda ablation](results/tables/T5_lambda_ablation.png)
+
+Removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly three-quarters of the gap against MVO.
+
+</details>
 
 ## Methodology
 

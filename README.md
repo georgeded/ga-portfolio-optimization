@@ -38,32 +38,74 @@ Adaptive cardinality K over time. The GA settles around K=16 on average, well be
 ## Repository Structure
 
 ```
-src/
-  data/           loader.py, universe.py, returns.py, risk_free_rate.py
-  benchmarks/     mvo.py, equal_weight.py
-  optimization/   genetic_algorithm.py, runner.py, optuna_tuner.py,
-                  k_sensitivity.py
-  evaluation/     metrics.py, figures.py, significance.py, tables.py,
-                  post_processing.py, convergence.py, frontier.py,
-                  k_sensitivity_tables.py, k_sensitivity_figures.py
-  ablation/       ablation_lambda.py
-  utils/          portfolio.py, data.py
-run_evaluation.sh
-tests/
-  test_metrics.py
-  test_genetic_algorithm.py
-  test_backtest_integrity.py
-results/
-  figures/         F1-F6, A1 convergence PNGs
-  tables/          T1_performance through T8_k_behavior (CSV, LaTeX, PNG)
-  k_sensitivity/   FK1, FK2, table (CSV, LaTeX, PNG)
-  ablation/        lambda ablation (CSV, PNG)
-  post_processing/ subperiod, TC sensitivity, K behavior (CSV, PNG)
+.
+  src/
+    data/             CRSP/FRED loading, universe filters, return matrices
+    benchmarks/       constrained MVO, unconstrained MVO, equal weight
+    optimization/     GA implementation, full runner, Optuna tuning,
+                      fixed-K sensitivity runs
+    evaluation/       metrics, figures, tables, significance tests,
+                      frontier, convergence, robustness outputs
+    ablation/         lambda=0 turnover-penalty ablation
+    utils/            shared portfolio and data helpers
+  tests/              synthetic integrity tests for metrics, GA operators,
+                      and backtest bookkeeping
+  data/
+    raw/              local WRDS/FRED inputs, not committed
+    processed/        generated intermediate data, not committed
+  results/
+    figures/          main paper figures and convergence plots
+    tables/           performance, significance, characteristics, robustness
+    k_sensitivity/    fixed-K figures and tables
+    ablation/         lambda ablation outputs
+    post_processing/  subperiod, transaction-cost, and K-behavior outputs
+    optuna/           tuned GA parameter file
+  visualizer/
+    index.html        Vite entry page and Google Fonts link
+    package.json      React visualizer dependencies and scripts
+    src/App.jsx       GA walkthrough screens and portfolio demos
+    src/index.css     theme, layout, formula, and chart styles
+    src/main.jsx      React mount point
+  run_evaluation.sh   runs the evaluation/reporting scripts
+  REPRODUCIBILITY.md  compact command order for full reproduction
+```
+
+## Setup
+
+Python 3.11+ is required for the research pipeline.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python3 -m pytest
+```
+
+Key Python dependencies: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pyarrow`, `statsmodels`, `optuna`, `matplotlib`, `seaborn`, `tqdm`.
+
+The visualizer is a separate Vite/React app under `visualizer/`.
+
+```bash
+cd visualizer
+npm install
+npm run dev
+```
+
+For a production build:
+
+```bash
+cd visualizer
+npm run build
 ```
 
 ## Reproduction
 
-Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription. Download the monthly stock file (CIZ format, 2000 to 2025) (WRDS path: CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File. Required columns include MthCalDt, MthRet, MthRetx, MthPrc, PrimaryExch, ShareType, SecurityType, SecuritySubType, USIncFlg, IssuerType, ShrOut) and the FRED DTB3 series, then place them in `data/raw/` as `crsp_returns.csv` and `risk_free_rate.csv`.
+Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription and is not committed.
+
+Place these files in `data/raw/`:
+
+- `crsp_returns.csv`: CRSP monthly stock file, CIZ format, 2000-2025. WRDS path: CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
+- `risk_free_rate.csv`: FRED DTB3 series, 3-month T-bill annual percent, saved as downloaded from FRED.
 
 **1. Data loading**
 
@@ -103,7 +145,7 @@ python3 -m src.optimization.optuna_tuner
 python3 -m src.optimization.runner
 ```
 
-Resume from checkpoint by running the same command again. Use `--debug` for a fast 10-period smoke test (3 runs, 50 generations):
+Resume from checkpoint by running the same command again. Use `--debug` for a fast 10-period smoke test with 3 runs and 50 generations:
 
 ```bash
 python3 -m src.optimization.runner --debug
@@ -147,19 +189,6 @@ python3 -m src.evaluation.k_sensitivity_figures
 python3 -m src.evaluation.convergence
 python3 -m src.evaluation.frontier
 ```
-
-## Setup
-
-Python 3.11+.
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 -m pytest
-```
-
-Key dependencies: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pyarrow`, `statsmodels`, `optuna`, `matplotlib`, `seaborn`, `tqdm`.
 
 ## Limitations and reproducibility
 

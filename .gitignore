@@ -242,3 +242,7 @@ results/optuna/*
 results/post_processing/*
 !results/post_processing/*.png
 !results/post_processing/*.csv
+
+# Visualizer
+visualizer/node_modules/
+visualizer/dist/

@@ -82,45 +82,127 @@ Removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly t
 
 ## Repository Structure
 
-The repository is organized around data preparation, benchmark construction, GA optimization, evaluation outputs, and the interactive visualizer.
+The repository is organized around the research pipeline, generated outputs, thesis documents, tests, automation, and the interactive visualizer.
 
 <details>
 <summary><strong>Click to expand repository structure</strong></summary>
 
-```
+```text
 .
-  docs/
-    thesis.pdf        full BSc thesis writeup
-    presentation.pdf  defense slides
-  src/
-    data/             CRSP/FRED loading, universe filters, return matrices
-    benchmarks/       constrained MVO, unconstrained MVO, equal weight
-    optimization/     GA implementation, full runner, Optuna tuning,
-                      fixed-K sensitivity runs
-    evaluation/       metrics, figures, tables, significance tests,
-                      frontier, convergence, robustness outputs
-    ablation/         lambda=0 turnover-penalty ablation
-    utils/            shared portfolio and data helpers
-  tests/              synthetic integrity tests for metrics, GA operators,
-                      and backtest bookkeeping
-  data/
-    raw/              local WRDS/FRED inputs, not committed
-    processed/        generated intermediate data, not committed
-  results/
-    figures/          main paper figures and convergence plots
-    tables/           performance, significance, characteristics, robustness
-    k_sensitivity/    fixed-K figures and tables
-    ablation/         lambda ablation outputs
-    post_processing/  subperiod, transaction-cost, and K-behavior outputs
-    optuna/           tuned GA parameter file
-  visualizer/
-    index.html        Vite entry page and Google Fonts link
-    package.json      React visualizer dependencies and scripts
-    src/App.jsx       GA walkthrough screens and portfolio demos
-    src/index.css     theme, layout, formula, and chart styles
-    src/main.jsx      React mount point
-  run_evaluation.sh   runs the evaluation/reporting scripts
-  REPRODUCIBILITY.md  compact command order for full reproduction
+├── .github/
+│   └── workflows/
+│       └── tests.yml                         GitHub Actions test workflow
+├── docs/
+│   ├── presentation.pdf                      defense slides
+│   └── thesis.pdf                            full BSc thesis writeup
+├── results/
+│   ├── ablation/                             lambda-ablation outputs
+│   │   ├── lambda_ablation_summary.csv
+│   │   └── lambda_ablation_table.png
+│   ├── figures/                              main paper figures and convergence plots
+│   │   ├── A1_convergence.png
+│   │   ├── A1_convergence_comparison.png
+│   │   ├── A1_convergence_default.png
+│   │   ├── A1_convergence_tuned.png
+│   │   ├── F1_cumulative_returns.png
+│   │   ├── F2_rolling_sharpe.png
+│   │   ├── F3_turnover.png
+│   │   ├── F4_hhi.png
+│   │   ├── F5_cardinality.png
+│   │   └── F6_frontier.png
+│   ├── k_sensitivity/                        fixed-K figures and tables
+│   │   ├── FK1_sharpe_turnover_hhi_vs_k.png
+│   │   ├── FK2_cumulative_returns_by_k.png
+│   │   ├── table_k_sensitivity.csv
+│   │   ├── table_k_sensitivity.png
+│   │   ├── table_k_sensitivity.tex
+│   │   └── table_k_sensitivity_formatted.csv
+│   ├── optuna/                               tuned GA parameter file
+│   │   └── best_params.json
+│   ├── post_processing/                      subperiod, transaction-cost, and K-behavior outputs
+│   │   ├── k_behavior.csv
+│   │   ├── k_behavior.png
+│   │   ├── subperiod_robustness.csv
+│   │   ├── subperiod_robustness.png
+│   │   ├── tc_sensitivity.csv
+│   │   └── tc_sensitivity.png
+│   └── tables/                               performance, significance, characteristics, robustness tables
+│       ├── T1_performance.csv
+│       ├── T1_performance.png
+│       ├── T1_performance.tex
+│       ├── T2_significance.csv
+│       ├── T2_significance.png
+│       ├── T2_significance.tex
+│       ├── T3_characteristics.csv
+│       ├── T3_characteristics.png
+│       ├── T3_characteristics.tex
+│       ├── T4_k_sensitivity.csv
+│       ├── T4_k_sensitivity.png
+│       ├── T5_lambda_ablation.png
+│       ├── T6_subperiod_robustness.png
+│       ├── T7_tc_sensitivity.png
+│       ├── T8_k_behavior.csv
+│       └── T8_k_behavior.png
+├── src/
+│   ├── __init__.py
+│   ├── ablation/                             lambda=0 turnover-penalty ablation
+│   │   ├── __init__.py
+│   │   └── ablation_lambda.py
+│   ├── benchmarks/                           constrained MVO, unconstrained MVO, equal weight
+│   │   ├── __init__.py
+│   │   ├── equal_weight.py
+│   │   └── mvo.py
+│   ├── data/                                 CRSP/FRED loading, universe filters, return matrices
+│   │   ├── __init__.py
+│   │   ├── loader.py
+│   │   ├── returns.py
+│   │   ├── risk_free_rate.py
+│   │   └── universe.py
+│   ├── evaluation/                           metrics, figures, tables, significance tests
+│   │   ├── __init__.py
+│   │   ├── convergence.py
+│   │   ├── figures.py
+│   │   ├── frontier.py
+│   │   ├── k_sensitivity_figures.py
+│   │   ├── k_sensitivity_tables.py
+│   │   ├── metrics.py
+│   │   ├── post_processing.py
+│   │   ├── significance.py
+│   │   └── tables.py
+│   ├── optimization/                         GA implementation, full runner, Optuna tuning, fixed-K runs
+│   │   ├── __init__.py
+│   │   ├── genetic_algorithm.py
+│   │   ├── k_sensitivity.py
+│   │   ├── optuna_tuner.py
+│   │   └── runner.py
+│   └── utils/                                shared portfolio and data helpers
+│       ├── __init__.py
+│       ├── data.py
+│       └── portfolio.py
+├── tests/                                    synthetic integrity tests
+│   ├── test_backtest_integrity.py
+│   ├── test_genetic_algorithm.py
+│   └── test_metrics.py
+├── visualizer/                               Vite/React interactive GA walkthrough
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public/
+│   │   └── favicon.svg
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   └── vite.config.js
+├── data/                                     expected local data folder, not committed
+│   ├── raw/                                  local WRDS/FRED inputs, untracked
+│   └── processed/                            generated intermediate data, untracked
+├── .gitignore
+├── LICENSE
+├── README.md
+├── REPRODUCIBILITY.md
+├── requirements.txt
+└── run_evaluation.sh
 ```
 
 </details>

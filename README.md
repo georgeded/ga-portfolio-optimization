@@ -82,6 +82,11 @@ Removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly t
 
 ## Repository Structure
 
+The repository is organized around data preparation, benchmark construction, GA optimization, evaluation outputs, and the interactive visualizer.
+
+<details>
+<summary><strong>Click to expand repository structure</strong></summary>
+
 ```
 .
   docs/
@@ -118,6 +123,8 @@ Removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly t
   REPRODUCIBILITY.md  compact command order for full reproduction
 ```
 
+</details>
+
 ## Setup
 
 Python 3.11+ is required for the research pipeline.
@@ -130,6 +137,9 @@ python3 -m pytest
 ```
 
 Key Python dependencies: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pyarrow`, `statsmodels`, `optuna`, `matplotlib`, `seaborn`, `tqdm`.
+
+<details>
+<summary><strong>Visualizer setup</strong></summary>
 
 The visualizer is a separate Vite/React app under `visualizer/`.
 
@@ -146,6 +156,8 @@ cd visualizer
 npm run build
 ```
 
+</details>
+
 ## Reproduction
 
 Run each step in order from the repository root. Raw CRSP data requires a WRDS subscription and is not committed.
@@ -155,39 +167,59 @@ Place these files in `data/raw/`:
 - `crsp_returns.csv`: CRSP monthly stock file, CIZ format, 2000-2025. WRDS path: CRSP Annual Update -> Stock Version 2 (CIZ) -> Monthly Stock File. Required columns: `MthCalDt`, `MthRet`, `MthRetx`, `MthPrc`, `PrimaryExch`, `ShareType`, `SecurityType`, `SecuritySubType`, `USIncFlg`, `IssuerType`, `ShrOut`.
 - `risk_free_rate.csv`: FRED DTB3 series, 3-month T-bill annual percent, saved as downloaded from FRED.
 
-**1. Data loading**
+<details>
+<summary><strong>1. Data loading</strong></summary>
 
 ```bash
 python3 -m src.data.loader
 python3 -m src.data.risk_free_rate
 ```
 
-**2. Universe construction**
+</details>
+
+<details>
+<summary><strong>2. Universe construction</strong></summary>
 
 ```bash
 python3 -m src.data.universe
 python3 -m src.data.returns
 ```
 
-**3. MVO benchmarks**
+</details>
+
+<details>
+<summary><strong>3. MVO benchmarks</strong></summary>
 
 ```bash
 python3 -m src.benchmarks.mvo
 ```
 
-**4. Equal-weight benchmark**
+</details>
+
+<details>
+<summary><strong>4. Equal-weight benchmark</strong></summary>
 
 ```bash
 python3 -m src.benchmarks.equal_weight
 ```
 
-**5. Optuna tuning** (optional, tuned parameters are already in `genetic_algorithm.py`)
+</details>
+
+<details>
+<summary><strong>5. Optuna tuning (optional)</strong></summary>
+
+Tuned parameters are already in `genetic_algorithm.py`.
 
 ```bash
 python3 -m src.optimization.optuna_tuner
 ```
 
-**6. Full GA run** (35-45 minutes on c2-standard-16, 8 physical cores)
+</details>
+
+<details>
+<summary><strong>6. Full GA run</strong></summary>
+
+35-45 minutes on c2-standard-16, 8 physical cores.
 
 ```bash
 python3 -m src.optimization.runner
@@ -199,7 +231,12 @@ Resume from checkpoint by running the same command again. Use `--debug` for a fa
 python3 -m src.optimization.runner --debug
 ```
 
-**6b. K-sensitivity** (optional, runs each fixed K value independently)
+</details>
+
+<details>
+<summary><strong>6b. K-sensitivity (optional)</strong></summary>
+
+Runs each fixed K value independently.
 
 ```bash
 python3 -m src.optimization.k_sensitivity
@@ -211,7 +248,12 @@ Or a single K value:
 python3 -m src.optimization.k_sensitivity --k 25
 ```
 
-**7. Lambda ablation** (about 30 minutes for the lambda=0 GA run)
+</details>
+
+<details>
+<summary><strong>7. Lambda ablation</strong></summary>
+
+About 30 minutes for the lambda=0 GA run.
 
 ```bash
 python3 -m src.ablation.ablation_lambda
@@ -219,7 +261,10 @@ python3 -m src.ablation.ablation_lambda
 
 This runs the full 252-period GA with lambda=0, then compares with the main results parquet.
 
-**8. Evaluation figures and tables**
+</details>
+
+<details>
+<summary><strong>8. Evaluation figures and tables</strong></summary>
 
 ```bash
 ./run_evaluation.sh
@@ -237,6 +282,8 @@ python3 -m src.evaluation.k_sensitivity_figures
 python3 -m src.evaluation.convergence
 python3 -m src.evaluation.frontier
 ```
+
+</details>
 
 ## Limitations and reproducibility
 

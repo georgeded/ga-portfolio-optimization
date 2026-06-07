@@ -146,7 +146,7 @@ body {
 
 .run-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   margin-bottom: 8px;
@@ -431,7 +431,7 @@ body {
   }
 
   .run-row {
-    grid-template-columns: 44px minmax(0, 1fr);
+    grid-template-columns: 58px minmax(0, 1fr);
     gap: 6px;
   }
 
@@ -551,5 +551,23 @@ body {
     max-width: 100%;
     overflow-x: auto;
     vertical-align: middle;
+  }
+}
+
+@media (max-width: 480px) {
+  .run-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .run-seed {
+    align-self: flex-start;
+  }
+
+  .run-tag {
+    align-self: flex-start;
+    margin-top: 0;
   }
 }

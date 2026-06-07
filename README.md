@@ -1,5 +1,18 @@
 # GA Portfolio Optimization
 
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-1.26%2B-013243?logo=numpy&logoColor=white)
+![pandas](https://img.shields.io/badge/pandas-2.2%2B-150458?logo=pandas&logoColor=white)
+![SciPy](https://img.shields.io/badge/SciPy-1.11%2B-8CAAE6?logo=scipy&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4%2B-F7931E?logo=scikitlearn&logoColor=white)
+![Matplotlib](https://img.shields.io/badge/Matplotlib-3.8%2B-11557C?logo=matplotlib&logoColor=white)
+![React](https://img.shields.io/badge/React-18.2%2B-61DAFB?logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-5.2%2B-646CFF?logo=vite&logoColor=white)
+![Genetic Algorithms](https://img.shields.io/badge/Genetic%20Algorithms-cardinality%20GA-0F766E)
+![Portfolio Optimization](https://img.shields.io/badge/Portfolio-Optimization-2563EB)
+![Reproducible](https://img.shields.io/badge/Reproducible-pipeline-16A34A)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-constrained US equity portfolios and is evaluated out-of-sample against MVO and equal-weight benchmarks from January 2005 to December 2025 (252 monthly periods) on a universe of around 870 stocks. The GA underperforms all three benchmarks, with a Sharpe of 0.274 vs 0.581 for MVO.
 
 An interactive step-by-step walkthrough of the algorithm is live at [ga-visualizer.netlify.app](https://ga-visualizer.netlify.app/). The full thesis and defense slides are available in [`docs/thesis.pdf`](docs/thesis.pdf) and [`docs/presentation.pdf`](docs/presentation.pdf).

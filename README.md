@@ -15,7 +15,7 @@
 
 BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-constrained US equity portfolios and is evaluated out-of-sample against MVO and equal-weight benchmarks from January 2005 to December 2025 (252 monthly periods) on a universe of around 870 stocks. The GA underperforms all three benchmarks, with a Sharpe of 0.274 vs 0.581 for MVO.
 
-An interactive step-by-step walkthrough of the algorithm is live at [ga-visualizer.netlify.app](https://ga-visualizer.netlify.app/). The full thesis and defense slides are available in [`docs/thesis.pdf`](docs/thesis.pdf) and [`docs/presentation.pdf`](docs/presentation.pdf).
+An interactive step-by-step walkthrough of the algorithm is live at [ga-visualizer.netlify.app](https://ga-visualizer.netlify.app/). The full thesis and defense slides are available in [`docs/thesis.pdf`](docs/thesis.pdf), [`docs/presentation.pdf`](docs/presentation.pdf), and [`docs/presentation.pptx`](docs/presentation.pptx).
 
 ## Results
 
@@ -93,7 +93,8 @@ The repository is organized around the research pipeline, generated outputs, the
 │   └── workflows/
 │       └── tests.yml                         GitHub Actions test workflow
 ├── docs/
-│   ├── presentation.pdf                      defense slides
+│   ├── presentation.pdf                      defense slides, PDF
+│   ├── presentation.pptx                     defense slides, PowerPoint
 │   └── thesis.pdf                            full BSc thesis writeup
 ├── results/
 │   ├── ablation/                             lambda-ablation outputs

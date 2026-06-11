@@ -16,13 +16,16 @@ const POPULATION = [
 const PARENT_A = POPULATION[0]
 const PARENT_B = POPULATION[2]
 
-// the P1 x P3 child at each pipeline stage
-const BLEND_CHILD    = [.15, .05, 0, .14, 0, .08, .13, 0, .08, .14, 0, .01]
-const MUTATED_CHILD  = [.18, .03, 0, .15, .02, 0, .09, 0, .10, .11, 0, .01]
-const REPAIRED_CHILD = [.15, .10, 0, .15, .08, 0, .15, 0, .15, .15, 0, .07]
-const REFINED_BEST   = [.15, 0, .15, .15, 0, .12, .11, 0, .15, .15, 0, .02]
+// the P1 x P3 children at each pipeline stage, later steps follow child 1
+const BLEND_CHILD     = [.15, .05, 0, .14, 0, .08, .13, 0, .08, .14, 0, .01]
+const BLEND_CHILD_TWO = [.14, 0, .05, .15, .09, 0, .14, 0, 0, .13, .10, 0]
+const MUTATED_CHILD   = [.18, .03, 0, .15, .02, 0, .09, 0, .10, .11, 0, 0]
+// repair stage 1 reactivates one zero-weight slot at the 0.02 floor
+const STAGE1_CHILD    = [.18, .03, 0, .15, .02, 0, .09, .02, .10, .11, 0, 0]
+const REPAIRED_CHILD  = [.15, .09, 0, .15, .08, 0, .15, .08, .15, .15, 0, 0]
+const REFINED_BEST    = [.15, 0, .15, .15, 0, .12, .11, 0, .15, .15, 0, .02]
 
-const NOISE_AND_SWAP = { 0: '+0.03', 1: '-0.02', 3: '+0.01', 4: 'in', 5: 'out', 6: '-0.04', 8: '+0.02', 9: '-0.03' }
+const NOISE_AND_SWAP = { 0: '+0.03', 1: '-0.02', 3: '+0.01', 4: 'in', 5: 'out', 6: '-0.04', 8: '+0.02', 9: '-0.03', 11: '-0.03' }
 
 const NEXT_GENERATION = [
   { id: '#1', fitness: 1.16, tag: 'elite, refined', dark: true, weights: REFINED_BEST },
@@ -147,10 +150,12 @@ function CrossoverStep() {
       <div className="flow-divider">+</div>
       <StripRow label={PARENT_B.id} weights={PARENT_B.weights} right={`f = ${PARENT_B.fitness.toFixed(2)}`} tag="Parent 2" dark />
       <div className="flow-divider">
-        child K drawn from [10, 30], assets sampled from the parents' union by average weight,
-        then w = α · P1 + (1 - α) · P3 with one shared α, here 0.6
+        each child draws its own K from [10, 30] and samples assets from the parents' union by average weight,
+        <br />
+        then blends with one shared α per child: Child 1 = 0.6 · P1 + 0.4 · P3, Child 2 = 0.7 · P3 + 0.3 · P1 with roles swapped
       </div>
-      <StripRow label="Child" weights={BLEND_CHILD} right="Σw = 0.78" tag="repair pending" />
+      <StripRow label="Child 1" weights={BLEND_CHILD} right="Σw = 0.78" tag="repair pending" />
+      <StripRow label="Child 2" weights={BLEND_CHILD_TWO} right="Σw = 0.80" tag="repair pending" />
     </div>
   )
 }
@@ -175,9 +180,9 @@ function MutationStep() {
         </div>
       </div>
       <div className="strip-stack">
-        <StripRow label="Child" weights={BLEND_CHILD} right="Σw = 0.78" />
-        <div className="flow-divider">both fire here: noise shifts the held weights, the swap trades one asset</div>
-        <StripRow label="Mutated" weights={MUTATED_CHILD} marks={NOISE_AND_SWAP} right="Σw = 0.69" />
+        <StripRow label="Child 1" weights={BLEND_CHILD} right="Σw = 0.78" />
+        <div className="flow-divider">both fire here: noise shifts the held weights and pushes one negative, the swap trades one asset</div>
+        <StripRow label="Mutated" weights={MUTATED_CHILD} marks={NOISE_AND_SWAP} right="Σw = 0.68" tag="repair pending" />
       </div>
     </>
   )
@@ -196,13 +201,16 @@ function RepairStep() {
         <StripRow
           label="Mutated"
           weights={MUTATED_CHILD}
-          marks={{ 0: '0.18 > cap', 11: '0.01 < floor' }}
-          right="Σw = 0.69"
+          marks={{ 0: '0.18 > cap' }}
+          right="Σw = 0.68"
           tag="infeasible"
         />
         <div className="flow-divider">
-          cardinality fixed first, then bisection finds one uniform shift λ
-          so the clipped weights land in the bounds and sum to 1
+          stage 1, cardinality: 7 held is too few, a random zero-weight stock enters at the 0.02 floor
+        </div>
+        <StripRow label="Stage 1" weights={STAGE1_CHILD} marks={{ 7: 'in at 0.02' }} right="Σw = 0.70" tag="8 held" />
+        <div className="flow-divider">
+          stage 2, projection: bisection finds one uniform shift λ so the clipped weights land in [0.02, 0.15] and sum to 1
         </div>
         <StripRow label="Repaired" weights={REPAIRED_CHILD} right="Σw = 1.00" tag="feasible" dark />
       </div>
@@ -312,8 +320,8 @@ const STEPS = [
     key: 'crossover',
     name: 'Crossover',
     title: 'Crossover',
-    subtitle: 'Two parents blend into a child with one shared α',
-    note: 'Fires with pc = 0.6054 (Optuna tuned), otherwise both parents pass through unchanged. Each pair gives two mirrored children, we follow one. Thesis section 4.5.',
+    subtitle: 'Two parents blend into two children by swapping roles',
+    note: 'Fires with pc = 0.6054 (Optuna tuned), otherwise both parents pass through unchanged. Both children are repaired before joining the new population, later steps follow Child 1. Thesis section 4.5.',
     body: CrossoverStep,
   },
   {
@@ -328,7 +336,7 @@ const STEPS = [
     key: 'repair',
     name: 'Repair',
     title: 'Repair',
-    subtitle: 'A bisection projection restores feasibility in one pass',
+    subtitle: 'Cardinality is enforced first, then projection onto the bounded simplex',
     note: 'Plain clip and renormalise can bounce weights back out of bounds, the projection lands feasible in a single pass. If it shifts cardinality it recurses once. Thesis section 4.7.',
     body: RepairStep,
   },

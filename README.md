@@ -15,7 +15,7 @@
 
 BSc CS thesis project at VU Amsterdam. A genetic algorithm selects cardinality-constrained US equity portfolios and is evaluated out-of-sample against MVO and equal-weight benchmarks from January 2005 to December 2025 (252 monthly periods) on a universe of around 870 stocks. The GA underperforms all three benchmarks, with a Sharpe of 0.274 vs 0.581 for MVO.
 
-An interactive step-by-step walkthrough of the algorithm is live at [ga-visualizer.netlify.app](https://ga-visualizer.netlify.app/). The full thesis and defense slides are available in [`docs/thesis.pdf`](docs/thesis.pdf), [`docs/presentation.pdf`](docs/presentation.pdf), and [`docs/presentation.pptx`](docs/presentation.pptx).
+An interactive step-by-step walkthrough of the algorithm is live at [ga-visualizer.netlify.app](https://ga-visualizer.netlify.app/). It follows one generation end to end on a 12-slot demo chromosome, with the same operators as the real pipeline. The full thesis and defense slides are available in [`docs/thesis.pdf`](docs/thesis.pdf), [`docs/presentation.pdf`](docs/presentation.pdf), and [`docs/presentation.pptx`](docs/presentation.pptx).
 
 ## Results
 
@@ -75,7 +75,7 @@ Removing the penalty raises net Sharpe from 0.274 to 0.499, recovering roughly t
 
 - **Data:** CRSP monthly stock file (CIZ format), Jan 2000–Dec 2025 (WRDS). Risk-free rate: FRED DTB3 (3-month T-bill, annual % converted to monthly decimal).
 - **Universe:** NYSE/NASDAQ common stocks, market cap >= $2B (lagged 1 month). Around 870 eligible stocks per month. 60-month burn-in, first rebalancing January 2005. Covariance estimated with Ledoit-Wolf shrinkage (sklearn).
-- **GA:** Real-valued weight vector, K in [10, 30] non-zero entries each in [0.02, 0.15] summing to 1. Fitness = monthly Sharpe - lambda * Turnover (lambda = 1.8437). Tournament selection, union-based crossover with arithmetic blend, Gaussian mutation, bisection repair onto bounded simplex. 8 independent runs per period. Population 100, max 200 generations, 20-generation early stop.
+- **GA:** Real-valued weight vector, K in [10, 30] non-zero entries each in [0.02, 0.15] summing to 1. Fitness = monthly Sharpe - lambda * Turnover (lambda = 1.8437). Tournament selection, union-based crossover with arithmetic blend (two children per parent pair), Gaussian and asset-swap mutation, two-stage repair: cardinality enforcement, then bisection projection onto the bounded simplex. 8 independent runs per period. Population 100, max 200 generations, 20-generation early stop.
 - **MVO:** Long-only Sharpe maximisation via SLSQP (3 random restarts). Constrained variant caps individual weights at 0.15. Same estimation window, universe, and cost model as the GA.
 - **Evaluation:** 252 monthly OOS periods, rolling 60-month window. Transaction cost gamma = 0.3% per unit of turnover, deducted from all strategies. Significance: paired t-test and Jobson-Korkie test (Memmel 2003 correction).
 - **Tuning:** Optuna TPE sampler, 15 trials on 2005–2012 (96 periods). Tuned parameters (pc=0.6054, pm=0.1370, sigma_m=0.1469, lambda=1.8437) fixed for the full 2005–2025 evaluation.
@@ -189,7 +189,8 @@ The repository is organized around the research pipeline, generated outputs, the
 │   ├── package-lock.json
 │   ├── package.json
 │   ├── public/
-│   │   └── favicon.svg
+│   │   ├── favicon.svg
+│   │   └── fonts/                            self hosted Montserrat and Blinker
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── index.css
@@ -224,7 +225,7 @@ Key Python dependencies: `pandas`, `numpy`, `scipy`, `scikit-learn`, `pyarrow`, 
 <details>
 <summary><strong>Visualizer setup</strong></summary>
 
-The visualizer is a separate Vite/React app under `visualizer/`.
+The visualizer is a separate Vite/React app under `visualizer/`. It is laid out as fixed 16:9 slides to match the defense deck. Navigation works with the arrow keys, number keys 1 to 8, space, or a presenter clicker.
 
 ```bash
 cd visualizer
